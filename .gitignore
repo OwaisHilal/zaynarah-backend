@@ -1,0 +1,66 @@
+# ----------------------------------------
+# General Project Files
+# ----------------------------------------
+
+# Dependency directories
+/node_modules
+/vendor/
+/venv/
+
+# Log files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# ----------------------------------------
+# Build & Compiled Output
+# ----------------------------------------
+
+# TypeScript/JavaScript compiled output
+/dist/
+/build/
+/out/
+/tmp/
+
+# ----------------------------------------
+# Configuration & Secrets
+# ----------------------------------------
+
+# Environment variables
+# This is crucial! Never commit files containing passwords, API keys, etc.
+.env
+.env.*
+.flaskenv
+
+# Local configuration files
+*.local
+
+# Key/Certificate files
+*.key
+*.pem
+*.pfx
+
+# ----------------------------------------
+# Specific to Common Backend Tools
+# ----------------------------------------
+
+# VS Code directory (optional, but recommended)
+.vscode/
+
+# IDE/Editor specific files
+.idea/ # JetBrains IDEs (IntelliJ, PyCharm, WebStorm)
+*.swp   # Vim
+*~      # Emacs
+
+# ----------------------------------------
+# Backup/Archive Files
+# ----------------------------------------
+*.bak
+*.old
+*.zip
+*.tar.gz
