@@ -1,10 +1,11 @@
-// src/features/payments/payments.controller.js
 const Order = require('../orders/orders.model');
 const paymentService = require('../../services/payment.service');
 
 exports.createStripeSession = async (req, res, next) => {
   try {
     const { orderId } = req.body;
+    if (!orderId) return res.status(400).json({ message: 'Missing orderId' });
+
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
@@ -30,20 +31,22 @@ exports.createStripeSession = async (req, res, next) => {
 exports.createRazorpayOrder = async (req, res, next) => {
   try {
     const { orderId } = req.body;
+    if (!orderId) return res.status(400).json({ message: 'Missing orderId' });
+
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    const rOrder = await paymentService.createRazorpayOrder({ order });
+    const rpOrder = await paymentService.createRazorpayOrder({ order });
 
     order.paymentProvider = 'razorpay';
-    order.paymentIntentId = rOrder.id;
+    order.paymentIntentId = rpOrder.id;
     await order.save();
 
     res.json({
-      id: rOrder.id,
+      id: rpOrder.id,
       key: process.env.RAZORPAY_KEY_ID,
-      amount: rOrder.amount,
-      currency: rOrder.currency,
+      amount: rpOrder.amount,
+      currency: rpOrder.currency,
     });
   } catch (err) {
     next(err);

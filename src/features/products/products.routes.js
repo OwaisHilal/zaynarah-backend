@@ -1,13 +1,15 @@
-// src/features/products/products.routes.js
 const express = require('express');
 const ctrl = require('./products.controller');
-const { auth, admin } = require('../../middlewares/auth');
+const { requireLogin, requireAdmin } = require('../../middlewares/auth');
 const router = express.Router();
 
+// --- Public routes ---
 router.get('/', ctrl.list);
 router.get('/:id', ctrl.get);
-router.post('/', auth, admin, ctrl.create);
-router.put('/:id', auth, admin, ctrl.update);
-router.delete('/:id', auth, admin, ctrl.remove);
+
+// --- Admin routes ---
+router.post('/', requireLogin, requireAdmin, ctrl.create);
+router.put('/:id', requireLogin, requireAdmin, ctrl.update);
+router.delete('/:id', requireLogin, requireAdmin, ctrl.remove);
 
 module.exports = router;

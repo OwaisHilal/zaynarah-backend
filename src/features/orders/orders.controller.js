@@ -24,7 +24,10 @@ exports.get = async (req, res, next) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Not found' });
-    if (!req.user.isAdmin && (!order.user || !order.user.equals(req.user._id)))
+    if (
+      req.user.role !== 'admin' &&
+      (!order.user || !order.user.equals(req.user._id))
+    )
       return res.status(403).json({ message: 'Forbidden' });
     res.json(order);
   } catch (err) {
