@@ -1,10 +1,16 @@
-// src/features/auth/auth.routes.js
-const express = require('express');
-const ctrl = require('./auth.controller');
-const router = express.Router();
+const router = require('express').Router();
+const authCtrl = require('./auth.controller');
+const validate = require('../../middlewares/validate');
+const { requireLogin } = require('../../middlewares/auth');
 
-router.post('/register', ctrl.register);
-router.post('/login', ctrl.login);
-router.get('/me', ctrl.me);
+const { registerSchema } = require('../users/users.validation');
+const { loginSchema } = require('./auth.validation');
+
+// --- Public routes ---
+router.post('/register', validate(registerSchema), authCtrl.register);
+router.post('/login', validate(loginSchema), authCtrl.login);
+
+// --- Authenticated routes ---
+router.get('/me', requireLogin, authCtrl.me);
 
 module.exports = router;

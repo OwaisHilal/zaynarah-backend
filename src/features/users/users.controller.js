@@ -1,14 +1,24 @@
-// src/features/users/users.controller.js
 const userService = require('./users.service');
-const bcrypt = require('bcryptjs');
+const ApiError = require('../../core/errors/ApiError');
+const jwt = require('jsonwebtoken');
+
+function signToken(id) {
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  });
+}
 
 module.exports = {
   register: async (req, res, next) => {
     try {
-      const user = await userService.createUser(req.body);
+      const body = req.validatedBody;
+      const user = await userService.createUser(body);
+      const token = signToken(user.id);
+
       res.status(201).json({
         message: 'Account created successfully',
-        user: { ...user.toObject(), password: undefined },
+        token,
+        user,
       });
     } catch (err) {
       next(err);
@@ -17,7 +27,7 @@ module.exports = {
 
   profile: async (req, res, next) => {
     try {
-      const user = await userService.getUserById(req.user._id);
+      const user = await userService.getUserById(req.user.id);
       res.json(user);
     } catch (err) {
       next(err);
@@ -26,7 +36,8 @@ module.exports = {
 
   updateProfile: async (req, res, next) => {
     try {
-      const updated = await userService.updateUser(req.user._id, req.body);
+      const body = req.validatedBody;
+      const updated = await userService.updateUser(req.user.id, body);
       res.json(updated);
     } catch (err) {
       next(err);
@@ -35,25 +46,26 @@ module.exports = {
 
   changePassword: async (req, res, next) => {
     try {
-      const { oldPassword, newPassword } = req.body;
-      const user = req.user;
+      const { oldPassword, newPassword } = req.validatedBody;
+      const match = await req.user.matchPassword(oldPassword);
+      if (!match) throw new ApiError(400, 'Incorrect old password');
 
-      const match = await user.matchPassword(oldPassword);
-      if (!match) throw { status: 400, message: 'Incorrect old password' };
-
-      await userService.changePassword(user, newPassword);
-
+      await userService.changePassword(req.user, newPassword);
       res.json({ message: 'Password updated successfully' });
     } catch (err) {
       next(err);
     }
   },
 
-  // --- Admin ---
   getAllUsers: async (req, res, next) => {
     try {
-      const users = await userService.getAllUsers();
-      res.json(users);
+      const { page, limit, search } = req.validatedQuery;
+      const data = await userService.getAllUsers({
+        page: Number(page),
+        limit: Number(limit),
+        search,
+      });
+      res.json(data);
     } catch (err) {
       next(err);
     }
@@ -61,9 +73,10 @@ module.exports = {
 
   updateUserRole: async (req, res, next) => {
     try {
+      const { role } = req.validatedBody;
       const updated = await userService.updateRole(
-        req.params.userId,
-        req.body.role
+        req.validatedParams.userId,
+        role
       );
       res.json(updated);
     } catch (err) {
@@ -73,8 +86,8 @@ module.exports = {
 
   deleteUser: async (req, res, next) => {
     try {
-      await userService.deleteUser(req.params.userId);
-      res.json({ message: 'User deleted' });
+      await userService.deleteUser(req.validatedParams.userId);
+      res.json({ message: 'User deleted successfully' });
     } catch (err) {
       next(err);
     }

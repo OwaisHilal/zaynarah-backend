@@ -1,18 +1,40 @@
+// src/features/users/users.routes.js
 const router = require('express').Router();
-const ctrl = require('./users.controller');
+const userCtrl = require('./users.controller');
 const { requireLogin, requireAdmin } = require('../../middlewares/auth');
+const validate = require('../../middlewares/validate');
 
-// --- Public routes ---
-router.post('/register', ctrl.register);
+const {
+  registerSchema,
+  updateProfileSchema,
+  changePasswordSchema,
+  updateRoleSchema,
+} = require('./users.validation');
 
-// --- Authenticated routes ---
-router.get('/me', requireLogin, ctrl.profile);
-router.put('/me', requireLogin, ctrl.updateProfile);
-router.put('/me/change-password', requireLogin, ctrl.changePassword);
+router.post('/register', validate(registerSchema), userCtrl.register);
 
-// --- Admin routes ---
-router.get('/', requireLogin, requireAdmin, ctrl.getAllUsers);
-router.put('/:userId/role', requireLogin, requireAdmin, ctrl.updateUserRole);
-router.delete('/:userId', requireLogin, requireAdmin, ctrl.deleteUser);
+router.get('/me', requireLogin, userCtrl.profile);
+router.put(
+  '/me',
+  requireLogin,
+  validate(updateProfileSchema),
+  userCtrl.updateProfile
+);
+router.put(
+  '/me/change-password',
+  requireLogin,
+  validate(changePasswordSchema),
+  userCtrl.changePassword
+);
+
+router.get('/', requireLogin, requireAdmin, userCtrl.getAllUsers);
+router.put(
+  '/:userId/role',
+  requireLogin,
+  requireAdmin,
+  validate({ body: updateRoleSchema }),
+  userCtrl.updateUserRole
+);
+router.delete('/:userId', requireLogin, requireAdmin, userCtrl.deleteUser);
 
 module.exports = router;

@@ -1,5 +1,3 @@
-// src/features/users/users.model.js
-
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
@@ -22,18 +20,27 @@ const UserSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ✅ FIXED pre-save hook: Removed 'next' parameter and calls to 'next()'.
-// Mongoose automatically waits for an async pre-hook to resolve.
+// Pre-save hook to hash password only if modified
 UserSchema.pre('save', async function () {
-  // 👇 The error was originating from this line (line 27 in your log) when calling it with 'next'.
   if (this.isModified('password')) {
     this.password = await bcrypt.hash(this.password, 10);
-  } // No need to call next() here. If an error occurs, Mongoose will catch the thrown exception.
+  }
 });
 
 // Method to compare passwords
 UserSchema.methods.matchPassword = function (enteredPassword) {
   return bcrypt.compare(enteredPassword, this.password);
 };
+
+// Transform output when converting document to JSON
+UserSchema.set('toJSON', {
+  transform: (doc, ret) => {
+    ret.id = ret._id.toString();
+    delete ret._id;
+    delete ret.__v;
+    delete ret.password;
+    return ret;
+  },
+});
 
 module.exports = mongoose.models.User || mongoose.model('User', UserSchema);
