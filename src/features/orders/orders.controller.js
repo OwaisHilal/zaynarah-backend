@@ -6,7 +6,8 @@ module.exports = {
   // Create a new order
   create: async (req, res, next) => {
     try {
-      const { items, address, totalAmount, currency } = req.validatedBody;
+      const { items, address, totalAmount, currency, paymentMethod } =
+        req.validatedBody;
 
       const order = await Order.create({
         user: req.user?._id,
@@ -14,6 +15,7 @@ module.exports = {
         address,
         totalAmount,
         currency: currency || 'INR',
+        paymentMethod,
         status: 'pending',
       });
 
