@@ -65,4 +65,46 @@ module.exports = {
     if (!user) throw new ApiError(404, 'User not found');
     return true;
   },
+
+  // ============================
+  // ADDRESS FUNCTIONS
+  // ============================
+  getAddresses: async (userId) => {
+    const user = await User.findById(userId).select('addresses');
+    if (!user) throw new ApiError(404, 'User not found');
+    return user.addresses;
+  },
+
+  addAddress: async (userId, addressData) => {
+    const user = await User.findById(userId);
+    if (!user) throw new ApiError(404, 'User not found');
+
+    user.addresses.push(addressData);
+    await user.save();
+    return user.addresses[user.addresses.length - 1];
+  },
+
+  updateAddress: async (userId, addressId, addressData) => {
+    const user = await User.findById(userId);
+    if (!user) throw new ApiError(404, 'User not found');
+
+    const address = user.addresses.id(addressId);
+    if (!address) throw new ApiError(404, 'Address not found');
+
+    Object.assign(address, addressData);
+    await user.save();
+    return address;
+  },
+
+  deleteAddress: async (userId, addressId) => {
+    const user = await User.findById(userId);
+    if (!user) throw new ApiError(404, 'User not found');
+
+    const address = user.addresses.id(addressId);
+    if (!address) throw new ApiError(404, 'Address not found');
+
+    address.remove();
+    await user.save();
+    return true;
+  },
 };

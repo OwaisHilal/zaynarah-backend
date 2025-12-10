@@ -9,6 +9,9 @@ function signToken(id) {
 }
 
 module.exports = {
+  // -------------------------
+  // AUTH / PROFILE
+  // -------------------------
   register: async (req, res, next) => {
     try {
       const body = req.validatedBody;
@@ -57,6 +60,9 @@ module.exports = {
     }
   },
 
+  // -------------------------
+  // ADMIN
+  // -------------------------
   getAllUsers: async (req, res, next) => {
     try {
       const { page, limit, search } = req.validatedQuery;
@@ -88,6 +94,52 @@ module.exports = {
     try {
       await userService.deleteUser(req.validatedParams.userId);
       res.json({ message: 'User deleted successfully' });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // -------------------------
+  // ADDRESSES
+  // -------------------------
+  getAddresses: async (req, res, next) => {
+    try {
+      const addresses = await userService.getAddresses(req.user.id);
+      res.json(addresses);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  addAddress: async (req, res, next) => {
+    try {
+      const newAddress = await userService.addAddress(
+        req.user.id,
+        req.validatedBody
+      );
+      res.status(201).json(newAddress);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  updateAddress: async (req, res, next) => {
+    try {
+      const updated = await userService.updateAddress(
+        req.user.id,
+        req.params.addressId,
+        req.validatedBody
+      );
+      res.json(updated);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  deleteAddress: async (req, res, next) => {
+    try {
+      await userService.deleteAddress(req.user.id, req.params.addressId);
+      res.json({ message: 'Address deleted successfully' });
     } catch (err) {
       next(err);
     }

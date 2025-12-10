@@ -1,13 +1,6 @@
 // src/features/users/users.validation.js
 const { z } = require('zod');
 
-// Register schema
-const registerSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters').max(50),
-  email: z.string().email('Invalid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-});
-
 // Address schema
 const addressSchema = z.object({
   name: z.string().min(1, 'Address name required').max(100),
@@ -25,6 +18,12 @@ const updateProfileSchema = z
     message: 'At least one field is required',
   });
 
+const registerSchema = z.object({
+  name: z.string().min(2, 'Name is required'),
+  email: z.string().email('Valid email required'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
 // Change password
 const changePasswordSchema = z.object({
   oldPassword: z.string().min(1, 'Old password required'),
@@ -37,8 +36,9 @@ const updateRoleSchema = z.object({
 });
 
 module.exports = {
-  registerSchema,
   updateProfileSchema,
   changePasswordSchema,
   updateRoleSchema,
+  addressSchema,
+  registerSchema,
 };

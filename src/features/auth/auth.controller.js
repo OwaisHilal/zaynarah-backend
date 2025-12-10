@@ -1,3 +1,4 @@
+// src/features/auth/controller.js
 const jwt = require('jsonwebtoken');
 const User = require('../users/users.model');
 const ApiError = require('../../core/errors/ApiError');
@@ -10,7 +11,9 @@ function signToken(id) {
 
 exports.register = async (req, res, next) => {
   try {
+    // now req.validatedBody is guaranteed to exist
     const { name, email, password } = req.validatedBody;
+
     const exists = await User.findOne({ email });
     if (exists) throw new ApiError(400, 'Email already registered');
 

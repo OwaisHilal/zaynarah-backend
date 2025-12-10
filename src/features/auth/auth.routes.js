@@ -1,3 +1,4 @@
+// src/feature/auth/auth.routes.js
 const router = require('express').Router();
 const authCtrl = require('./auth.controller');
 const validate = require('../../middlewares/validate');
