@@ -1,3 +1,4 @@
+// src/features/users/users.model.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
@@ -12,9 +13,16 @@ const AddressSchema = new mongoose.Schema(
     state: { type: String, required: true, trim: true },
     postalCode: { type: String, required: true, trim: true },
     country: { type: String, required: true, default: 'India' },
+    type: {
+      type: String,
+      enum: ['home', 'work', 'other'],
+      default: 'home',
+    },
+    isDefault: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
   },
-  { _id: false }
+  // keep sub-document _id so frontend can reference addresses by id
+  { timestamps: false }
 );
 
 const UserSchema = new mongoose.Schema(
@@ -47,6 +55,17 @@ UserSchema.set('toJSON', {
     delete ret._id;
     delete ret.__v;
     delete ret.password;
+    // convert addresses _id to id strings for front-end convenience
+    if (Array.isArray(ret.addresses)) {
+      ret.addresses = ret.addresses.map((a) => {
+        const copy = { ...a };
+        if (copy._id) {
+          copy.id = copy._id.toString();
+          delete copy._id;
+        }
+        return copy;
+      });
+    }
     return ret;
   },
 });

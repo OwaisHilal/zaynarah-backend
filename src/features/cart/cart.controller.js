@@ -1,3 +1,4 @@
+// src/features/cart/cart.controller.js
 const cartService = require('./cart.service');
 
 // Helper to normalize cart items for frontend

@@ -1,3 +1,6 @@
 // src/middlewares/rawBodyForWebhooks.js
-// (not required—stripe webhook handled in server.js by bodyParser.raw)
-module.exports = (req, res, next) => next();
+const express = require('express');
+
+exports.rawBodyForWebhooks = express.raw({
+  type: '*/*', // allow Stripe & Razorpay to receive raw body
+});

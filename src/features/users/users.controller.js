@@ -1,3 +1,4 @@
+// src/features/users/users.controller.js
 const userService = require('./users.service');
 const ApiError = require('../../core/errors/ApiError');
 const jwt = require('jsonwebtoken');
@@ -117,6 +118,7 @@ module.exports = {
         req.user.id,
         req.validatedBody
       );
+      // return address with id
       res.status(201).json(newAddress);
     } catch (err) {
       next(err);
@@ -140,6 +142,19 @@ module.exports = {
     try {
       await userService.deleteAddress(req.user.id, req.params.addressId);
       res.json({ message: 'Address deleted successfully' });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // New: set an address as default
+  setDefaultAddress: async (req, res, next) => {
+    try {
+      const address = await userService.setDefaultAddress(
+        req.user.id,
+        req.params.addressId
+      );
+      res.json(address);
     } catch (err) {
       next(err);
     }

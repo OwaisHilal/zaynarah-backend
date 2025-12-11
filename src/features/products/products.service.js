@@ -1,3 +1,4 @@
+// src/feature/products/products.service.js
 const Product = require('./products.model'); // Assuming the model is correctly exported from its file
 const { getPaginatedData } = require('../../core/utils/pagination'); // Assuming you have a pagination utility here
 

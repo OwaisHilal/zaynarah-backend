@@ -1,3 +1,4 @@
+// src/features/users/users.routes.js
 const router = require('express').Router();
 const userCtrl = require('./users.controller');
 const { requireLogin, requireAdmin } = require('../../middlewares/auth');
@@ -60,5 +61,12 @@ router.put(
   userCtrl.updateAddress
 );
 router.delete('/addresses/:addressId', requireLogin, userCtrl.deleteAddress);
+
+// New route: set address as default
+router.put(
+  '/addresses/:addressId/default',
+  requireLogin,
+  userCtrl.setDefaultAddress
+);
 
 module.exports = router;
