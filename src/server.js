@@ -52,6 +52,7 @@ const startServer = async () => {
   app.use('/api/orders', require('./features/orders/orders.routes'));
   app.use('/api/payments', require('./features/payments/payments.routes'));
   app.use('/api/users', require('./features/users/users.routes'));
+  app.use('/api/shipping', require('./features/shipping/shipping.routes'));
 
   /* -------------------------------------------------------------
      HEALTH CHECK

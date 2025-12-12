@@ -6,60 +6,65 @@ const objectIdString = z
   .length(24, 'Invalid id')
   .regex(/^[0-9a-fA-F]{24}$/, 'Invalid id');
 
+const addressSchema = z.object({
+  fullName: z.string().min(1),
+  phone: z.string().min(5),
+  email: z.string().email(),
+  addressLine1: z.string().min(1),
+  addressLine2: z.string().optional().default(''),
+  city: z.string().min(1),
+  state: z.string().min(1),
+  postalCode: z.string().min(1),
+  country: z.string().min(1),
+});
+
+const shippingMethodSchema = z.object({
+  _id: z.string().min(1),
+  label: z.string().min(1),
+  cost: z.number().min(0),
+  deliveryEstimate: z.string().optional(),
+  carrier: z.string().optional(),
+  metadata: z.record(z.any()).optional(),
+});
+
 const orderItemSchema = z.object({
   productId: objectIdString,
-  name: z.string().min(1),
-  price: z.number().positive(),
-  qty: z.number().int().min(1, 'Quantity must be at least 1'),
+  title: z.string().optional(),
+  name: z.string().optional(),
+  price: z.number().min(0),
+  qty: z.number().int().min(1),
   image: z.string().optional(),
+  sku: z.string().optional(),
 });
 
-// --- Legacy full order ---
-const createOrderSchema = z.object({
-  items: z.array(orderItemSchema).min(1, 'Order must have at least 1 item'),
-  address: z.object({
-    street: z.string().min(1),
-    city: z.string().min(1),
-    state: z.string().min(1),
-    zip: z.string().min(1),
-  }),
-  totalAmount: z.number().positive(),
+const cartTotalSchema = z.object({
+  items: z.number().min(0),
+  shipping: z.number().min(0),
+  tax: z.number().min(0),
+  grand: z.number().min(0),
   currency: z.string().optional().default('INR'),
+});
+
+const createOrderSchema = z.object({
+  items: z.array(orderItemSchema).min(1),
+  cartTotal: cartTotalSchema,
+  shippingAddress: addressSchema,
+  billingAddress: addressSchema.optional(),
+  shippingMethod: shippingMethodSchema.optional(),
   paymentMethod: z.enum(['stripe', 'razorpay']),
+  paymentDetails: z.any().optional(),
+  metadata: z.any().optional(),
 });
 
-// --- Admin update status ---
-const updateStatusSchema = z.object({
-  status: z.enum(['pending', 'paid', 'failed', 'cancelled', 'draft']),
-});
-
-const idParamSchema = z.object({
-  id: objectIdString,
-});
-
-// --- New checkout endpoints ---
-const initSessionSchema = z.object({}); // no payload needed
+const initSessionSchema = z.object({});
 
 const finalizePricingSchema = z.object({
   checkoutSessionId: z.string().min(1),
-  shippingAddress: z.object({
-    street: z.string().min(1),
-    city: z.string().min(1),
-    state: z.string().min(1),
-    zip: z.string().min(1),
-  }),
-  billingAddress: z
-    .object({
-      street: z.string().min(1),
-      city: z.string().min(1),
-      state: z.string().min(1),
-      zip: z.string().min(1),
-    })
-    .optional(),
-  shippingMethod: z
-    .enum(['standard', 'express'])
-    .optional()
-    .default('standard'),
+  shippingAddress: addressSchema,
+  billingAddress: addressSchema.optional(),
+  shippingMethod: shippingMethodSchema.optional(),
+  weight: z.number().min(0).optional().default(0),
+  itemsCount: z.number().int().min(0).optional().default(0),
 });
 
 const createDraftSchema = z.object({
@@ -67,7 +72,6 @@ const createDraftSchema = z.object({
   paymentGateway: z.enum(['stripe', 'razorpay']),
 });
 
-// --- Payment schemas ---
 const confirmPaymentSchema = z.object({
   orderId: objectIdString,
   paymentIntentId: z.string().min(1),
@@ -79,9 +83,15 @@ const paymentFailedSchema = z.object({
   reason: z.string().min(1),
 });
 
+const idParamSchema = z.object({
+  id: objectIdString,
+});
+
 module.exports = {
   createOrderSchema,
-  updateStatusSchema,
+  updateStatusSchema: z.object({
+    status: z.enum(['draft', 'pending', 'paid', 'failed', 'cancelled']),
+  }),
   idParamSchema,
   initSessionSchema,
   finalizePricingSchema,

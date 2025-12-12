@@ -1,83 +1,104 @@
-// src/orders/orders.model.js
+// src/features/orders/orders.model.js
 const mongoose = require('mongoose');
+
+const addressSchema = new mongoose.Schema(
+  {
+    fullName: String,
+    phone: String,
+    email: String,
+    addressLine1: String,
+    addressLine2: String,
+    city: String,
+    state: String,
+    postalCode: String,
+    country: String,
+  },
+  { _id: false }
+);
+
+const shippingMethodSchema = new mongoose.Schema(
+  {
+    _id: { type: String }, // shipping service id returned by shipping provider
+    label: String,
+    cost: { type: Number, default: 0 },
+    deliveryEstimate: String, // "Arrives by Tuesday"
+    carrier: String,
+    metadata: { type: Object, default: {} },
+  },
+  { _id: false }
+);
+
+const itemSchema = new mongoose.Schema(
+  {
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      required: true,
+    },
+    title: String,
+    price: Number,
+    qty: Number,
+    image: String,
+    sku: String,
+  },
+  { _id: false }
+);
+
+const cartTotalSchema = new mongoose.Schema(
+  {
+    items: { type: Number, default: 0 },
+    shipping: { type: Number, default: 0 },
+    tax: { type: Number, default: 0 },
+    grand: { type: Number, default: 0 },
+    currency: { type: String, default: 'INR' },
+  },
+  { _id: false }
+);
 
 const orderSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
-    // Multi-step checkout
     checkoutSessionId: { type: String, unique: true, sparse: true },
 
-    items: [
-      {
-        productId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: 'Product',
-          required: true,
-        },
-        name: { type: String, required: true },
-        price: { type: Number, required: true },
-        qty: { type: Number, required: true },
-        image: String,
-      },
-    ],
+    items: [itemSchema],
 
-    // Shipping & billing
-    address: {
-      street: { type: String },
-      city: { type: String },
-      state: { type: String },
-      zip: { type: String },
-    },
-    shippingAddress: {
-      street: { type: String },
-      city: { type: String },
-      state: { type: String },
-      zip: { type: String },
-    },
-    billingAddress: {
-      street: { type: String },
-      city: { type: String },
-      state: { type: String },
-      zip: { type: String },
-    },
-    shippingMethod: {
-      type: String,
-      enum: ['standard', 'express'],
-      default: 'standard',
-    },
+    cartTotal: cartTotalSchema,
 
-    // Payment
+    shippingAddress: addressSchema,
+    billingAddress: addressSchema,
+
+    shippingMethod: shippingMethodSchema,
+
     paymentMethod: {
       type: String,
       enum: ['stripe', 'razorpay'],
+      required: true,
+      default: 'stripe',
     },
+    paymentDetails: { type: Object, default: {} },
+
     paymentProvider: {
       type: String,
-      enum: ['stripe', 'razorpay'],
+      enum: ['stripe', 'razorpay', null],
       default: null,
     },
-    paymentIntentId: { type: String, default: null },
+    paymentIntentId: String, // store provider order / intent id (stripe session id / razorpay order id / payment id)
     paymentStatus: {
       type: String,
       enum: ['pending', 'paid', 'failed'],
       default: 'pending',
     },
-    transactionId: { type: String },
 
-    // Total & status
-    totalAmount: { type: Number, required: true },
     status: {
       type: String,
-      enum: ['pending', 'paid', 'failed', 'cancelled', 'draft'],
+      enum: ['draft', 'pending', 'paid', 'failed', 'cancelled'],
       default: 'pending',
     },
 
-    // Metadata for calculations and payment failures
-    metadata: {
-      type: Object,
-      default: {},
-    },
+    metadata: { type: Object, default: {} },
+
+    paidAt: { type: Date },
   },
   { timestamps: true }
 );

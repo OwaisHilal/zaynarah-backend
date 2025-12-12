@@ -1,4 +1,4 @@
-// src/orders/orders.routes.js
+// src/features/orders/orders.routes.js
 const express = require('express');
 const router = express.Router();
 const ctrl = require('./orders.controller');
@@ -11,21 +11,25 @@ const {
   initSessionSchema,
   finalizePricingSchema,
   createDraftSchema,
+  confirmPaymentSchema,
+  paymentFailedSchema,
 } = require('./orders.validation');
 
-// Checkout session
+// Checkout lifecycle
 router.post(
   '/checkout/session/init',
   requireLogin,
   validate({ body: initSessionSchema }),
   ctrl.initSession
 );
+
 router.post(
   '/checkout/session/finalize-pricing',
   requireLogin,
   validate({ body: finalizePricingSchema }),
   ctrl.finalizePricing
 );
+
 router.post(
   '/create-draft',
   requireLogin,
@@ -33,17 +37,23 @@ router.post(
   ctrl.createDraft
 );
 
-// Manual order
+// Manual create (fallback)
 router.post(
-  '/',
+  '/create',
   requireLogin,
   validate({ body: createOrderSchema }),
   ctrl.create
 );
+
+// Get order by id
 router.get('/:id', requireLogin, validate({ params: idParamSchema }), ctrl.get);
 
-// Admin routes
+// User orders
+router.get('/my-orders', requireLogin, ctrl.myOrders);
+
+// Admin list / update
 router.get('/', requireLogin, requireAdmin, ctrl.listAdmin);
+
 router.put(
   '/:id/status',
   requireLogin,
@@ -52,11 +62,18 @@ router.put(
   ctrl.updateStatus
 );
 
-// User orders
-router.get('/my-orders', requireLogin, ctrl.myOrders);
-
-// Payment webhooks
-router.post('/confirm-payment', requireLogin, ctrl.confirmPayment);
-router.post('/payment-failed', requireLogin, ctrl.paymentFailed);
+// Payment callbacks (frontend may call)
+router.post(
+  '/confirm-payment',
+  requireLogin,
+  validate({ body: confirmPaymentSchema }),
+  ctrl.confirmPayment
+);
+router.post(
+  '/payment-failed',
+  requireLogin,
+  validate({ body: paymentFailedSchema }),
+  ctrl.paymentFailed
+);
 
 module.exports = router;

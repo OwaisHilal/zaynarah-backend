@@ -1,4 +1,4 @@
-// src/services/payment.service.js
+// src/features/payment/payment.service.js
 const Stripe = require('stripe');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
@@ -20,8 +20,8 @@ module.exports = {
 
     const lineItems = (order.items || []).map((item) => ({
       price_data: {
-        currency: (order.currency || 'INR').toLowerCase(),
-        product_data: { name: item.name || item.title || 'Product' },
+        currency: (order.cartTotal?.currency || 'INR').toLowerCase(),
+        product_data: { name: item.title || item.name || 'Product' },
         unit_amount: Math.round((item.price || 0) * 100),
       },
       quantity: item.qty || 1,
@@ -43,9 +43,13 @@ module.exports = {
   createStripePaymentIntent: async (order) => {
     if (!order) throw new ApiError(400, 'Order missing');
 
+    const amount = Math.round(
+      (order.cartTotal?.grand || order.totalAmount || 0) * 100
+    );
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round((order.totalAmount || 0) * 100),
-      currency: (order.currency || 'INR').toLowerCase(),
+      amount,
+      currency: (order.cartTotal?.currency || 'INR').toLowerCase(),
       metadata: { orderId: order._id.toString() },
     });
 
@@ -64,10 +68,12 @@ module.exports = {
   createRazorpayOrder: async (order) => {
     if (!order) throw new ApiError(400, 'Order missing');
 
-    const amountPaise = Math.round((order.totalAmount || 0) * 100);
+    const amountPaise = Math.round(
+      (order.cartTotal?.grand || order.totalAmount || 0) * 100
+    );
     const options = {
       amount: amountPaise,
-      currency: (order.currency || 'INR').toUpperCase(),
+      currency: (order.cartTotal?.currency || 'INR').toUpperCase(),
       receipt: order._id.toString(),
       payment_capture: 1,
       notes: { orderId: order._id.toString() },
