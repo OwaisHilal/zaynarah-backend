@@ -1,36 +1,41 @@
-// src/features/payments/payments.controller.js
 const Order = require('../orders/orders.model');
 const paymentService = require('../../services/payment.service');
-const ordersService = require('../orders/orders.service'); // to mark paid after verification
+const ordersService = require('../orders/orders.service');
 
-/**
- * Create Stripe Checkout Session
- * frontend expects { sessionId, publishableKey }
- */
+/* ========================= STRIPE ========================= */
+
 exports.createStripeCheckoutSession = async (req, res, next) => {
   try {
     const { orderId } = req.body;
-    if (!orderId) return res.status(400).json({ message: 'Missing orderId' });
+    if (!orderId) return res.status(400).json({ message: 'orderId required' });
 
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    const success_url = `${process.env.FRONTEND_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
-    const cancel_url = `${process.env.FRONTEND_URL}/checkout/cancel`;
+    // DEV MODE — no Stripe keys yet
+    if (!process.env.STRIPE_SECRET_KEY) {
+      order.paymentProvider = 'stripe';
+      order.paymentIntentId = `dev_stripe_${order._id}`;
+      await order.save();
+
+      return res.json({
+        sessionId: order.paymentIntentId,
+        publishableKey: 'dev',
+        dev: true,
+      });
+    }
 
     const session = await paymentService.createStripeCheckoutSession({
       order,
-      success_url,
-      cancel_url,
+      success_url: `${process.env.FRONTEND_URL}/checkout/success`,
+      cancel_url: `${process.env.FRONTEND_URL}/checkout/cancel`,
     });
 
-    // Save provider / intent if available (best-effort)
     order.paymentProvider = 'stripe';
-    order.paymentIntentId =
-      session.payment_intent || session.id || order.paymentIntentId;
+    order.paymentIntentId = session.id;
     await order.save();
 
-    return res.json({
+    res.json({
       sessionId: session.id,
       publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
     });
@@ -39,81 +44,58 @@ exports.createStripeCheckoutSession = async (req, res, next) => {
   }
 };
 
-/**
- * Create Stripe PaymentIntent (alternative flow)
- */
-exports.createStripePaymentIntent = async (req, res, next) => {
-  try {
-    const { orderId } = req.body;
-    if (!orderId) return res.status(400).json({ message: 'Missing orderId' });
+exports.createStripePaymentIntent = async (req, res) => {
+  // Optional flow – keep simple for now
+  res.status(501).json({ message: 'Stripe PaymentIntent not enabled yet' });
+};
 
-    const order = await Order.findById(orderId);
-    if (!order) return res.status(404).json({ message: 'Order not found' });
+exports.verifyStripePayment = async (req, res) => {
+  const { orderId } = req.body;
 
-    const paymentIntent = await paymentService.createStripePaymentIntent(order);
-
-    order.paymentProvider = 'stripe';
-    order.paymentIntentId = paymentIntent.id;
-    await order.save();
-
-    return res.json({
-      clientSecret: paymentIntent.client_secret,
-      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+  // DEV MODE → auto-success
+  if (!process.env.STRIPE_SECRET_KEY && orderId) {
+    await ordersService.markPaid(orderId, {
+      gateway: 'stripe',
+      paymentIntentId: 'dev',
     });
-  } catch (err) {
-    next(err);
+    return res.json({ success: true, dev: true });
   }
+
+  res.status(501).json({ message: 'Stripe verification not enabled yet' });
 };
 
-/**
- * Verify Stripe Payment (client may call, or webhook used)
- */
-exports.verifyStripePayment = async (req, res, next) => {
-  try {
-    const { paymentIntentId, orderId } = req.body;
-    if (!paymentIntentId)
-      return res.status(400).json({ message: 'Missing paymentIntentId' });
+/* ======================== RAZORPAY ======================== */
 
-    const ok = await paymentService.verifyStripePayment(paymentIntentId);
-    if (!ok)
-      return res
-        .status(400)
-        .json({ success: false, message: 'Payment not succeeded' });
-
-    // optionally mark order paid if orderId provided
-    if (orderId) {
-      await ordersService.markPaid(orderId, {
-        paymentIntentId,
-        gateway: 'stripe',
-      });
-    }
-
-    res.json({ success: true });
-  } catch (err) {
-    next(err);
-  }
-};
-
-/**
- * Create Razorpay Order (frontend expects { orderId, key, amount, currency })
- * note: rpOrder.id is razorpay order id; we save it to paymentIntentId
- */
 exports.createRazorpayOrder = async (req, res, next) => {
   try {
     const { orderId } = req.body;
-    if (!orderId) return res.status(400).json({ message: 'Missing orderId' });
+    if (!orderId) return res.status(400).json({ message: 'orderId required' });
 
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
+    // DEV MODE — no Razorpay keys
+    if (!process.env.RAZORPAY_KEY_ID) {
+      order.paymentProvider = 'razorpay';
+      order.paymentIntentId = `dev_rp_${order._id}`;
+      await order.save();
+
+      return res.json({
+        orderId: order.paymentIntentId,
+        key: 'dev',
+        amount: order.cartTotal.grand * 100,
+        currency: order.cartTotal.currency || 'INR',
+        dev: true,
+      });
+    }
+
     const rpOrder = await paymentService.createRazorpayOrder(order);
 
-    // Save razorpay order id on our order.paymentIntentId
     order.paymentProvider = 'razorpay';
     order.paymentIntentId = rpOrder.id;
     await order.save();
 
-    return res.json({
+    res.json({
       orderId: rpOrder.id,
       key: process.env.RAZORPAY_KEY_ID,
       amount: rpOrder.amount,
@@ -124,75 +106,23 @@ exports.createRazorpayOrder = async (req, res, next) => {
   }
 };
 
-/**
- * Verify Razorpay signature.
- */
-exports.verifyRazorpaySignature = async (req, res, next) => {
-  try {
-    const { orderId: providedOrderId, paymentId, signature } = req.body;
-    if (!providedOrderId || !paymentId || !signature)
-      return res
-        .status(400)
-        .json({ message: 'orderId, paymentId & signature required' });
+exports.verifyRazorpaySignature = async (req, res) => {
+  const { orderId } = req.body;
 
-    // Try to resolve our order
-    let order = null;
-    const isProbablyObjectId = /^[0-9a-fA-F]{24}$/.test(
-      String(providedOrderId)
-    );
-    if (isProbablyObjectId) {
-      order = await Order.findById(providedOrderId);
-    }
-    if (!order) {
-      order = await Order.findOne({ paymentIntentId: providedOrderId });
-    }
-    if (!order) return res.status(404).json({ message: 'Order not found' });
-
-    const razorpayOrderId = order.paymentIntentId || providedOrderId;
-
-    const isValid = paymentService.verifyRazorpaySignature(
-      razorpayOrderId,
-      paymentId,
-      signature
-    );
-    if (!isValid)
-      return res
-        .status(400)
-        .json({ success: false, message: 'Invalid signature' });
-
-    try {
-      await ordersService.markPaid(order._id, {
-        paymentIntentId: paymentId,
-        gateway: 'razorpay',
-      });
-    } catch (err) {
-      console.error(
-        'Failed to mark order paid after signature verification:',
-        err
-      );
-      return res
-        .status(500)
-        .json({ success: false, message: 'Failed to mark order paid' });
-    }
-
-    return res.json({ success: true });
-  } catch (err) {
-    next(err);
+  // DEV MODE → auto-success
+  if (!process.env.RAZORPAY_KEY_ID && orderId) {
+    await ordersService.markPaid(orderId, {
+      gateway: 'razorpay',
+      paymentIntentId: 'dev',
+    });
+    return res.json({ success: true, dev: true });
   }
+
+  res.status(501).json({ message: 'Razorpay verification not enabled yet' });
 };
 
-/**
- * Get payment status (tries stripe then razorpay)
- */
-exports.getPaymentStatus = async (req, res, next) => {
-  try {
-    const { paymentId } = req.params;
-    if (!paymentId)
-      return res.status(400).json({ message: 'Missing paymentId' });
+/* ======================== COMMON ========================== */
 
-    const status = await paymentService.getPaymentStatus(paymentId);
-    res.json({ paymentId, status });
-  } catch (err) {
-    next(err);
-  }
+exports.getPaymentStatus = async (req, res) => {
+  res.json({ status: 'pending' });
 };

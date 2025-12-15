@@ -1,16 +1,21 @@
 // src/features/cart/cart.controller.js
 const cartService = require('./cart.service');
 
-// Helper to normalize cart items for frontend
-const normalizeCart = (cart) => ({
-  items: (cart.items || []).map((i) => ({
-    productId: i.product._id,
-    title: i.product.title,
-    price: i.product.price,
-    image: i.product.image,
-    qty: i.quantity,
-  })),
-});
+const normalizeCart = (cart) => {
+  if (!cart || !Array.isArray(cart.items)) {
+    return { items: [] };
+  }
+
+  return {
+    items: cart.items.map((i) => ({
+      productId: i.product?._id?.toString() || null,
+      title: i.product?.title || i.product?.name || 'Untitled',
+      price: i.product?.price ?? 0,
+      image: i.product?.image || i.product?.images?.[0] || '',
+      qty: i.quantity,
+    })),
+  };
+};
 
 module.exports = {
   getCart: async (req, res, next) => {
@@ -26,6 +31,7 @@ module.exports = {
     try {
       const { productId, quantity } = req.validatedBody;
       const cart = await cartService.addItem(req.user.id, productId, quantity);
+
       res.json(normalizeCart(cart));
     } catch (err) {
       next(err);
@@ -36,11 +42,13 @@ module.exports = {
     try {
       const { quantity } = req.validatedBody;
       const { productId } = req.validatedParams;
+
       const cart = await cartService.updateItem(
         req.user.id,
         productId,
         quantity
       );
+
       res.json(normalizeCart(cart));
     } catch (err) {
       next(err);
@@ -50,6 +58,7 @@ module.exports = {
   removeItem: async (req, res, next) => {
     try {
       const { productId } = req.validatedParams;
+
       const cart = await cartService.removeItem(req.user.id, productId);
       res.json(normalizeCart(cart));
     } catch (err) {
@@ -70,6 +79,7 @@ module.exports = {
     try {
       const { items } = req.body;
       const cart = await cartService.mergeCart(req.user.id, items || []);
+
       res.json(normalizeCart(cart));
     } catch (err) {
       next(err);
@@ -79,7 +89,7 @@ module.exports = {
   getAllCarts: async (req, res, next) => {
     try {
       const carts = await cartService.getAllCarts();
-      res.json(carts); // admin can handle full object
+      res.json(carts); // Admin gets raw data
     } catch (err) {
       next(err);
     }

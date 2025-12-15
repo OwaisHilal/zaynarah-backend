@@ -1,16 +1,7 @@
 // src/feature/products/products.service.js
-const Product = require('./products.model'); // Assuming the model is correctly exported from its file
-const { getPaginatedData } = require('../../core/utils/pagination'); // Assuming you have a pagination utility here
+const Product = require('./products.model');
+const { getPaginatedData } = require('../../core/utils/pagination');
 
-// If you don't have a separate utility for Mongoose pagination,
-// we can use a helper function directly in this file.
-
-/**
- * Fetches a list of products with filtering, sorting, and pagination.
- *
- * @param {object} filters - Contains query parameters (page, limit, category, priceMax, sort).
- * @returns {Promise<object>} - The paginated result object { data: [...], total, page, totalPages, limit }.
- */
 exports.listProducts = async (filters) => {
   const {
     page = 1,

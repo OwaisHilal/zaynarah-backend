@@ -5,7 +5,6 @@ const Schema = mongoose.Schema;
 // --- Variant Schema ---
 const VariantSchema = new Schema(
   {
-    // SKU is critical and should be unique across all products for inventory
     sku: {
       type: String,
       required: true,

@@ -10,16 +10,13 @@ const logger = require('./lib/logger');
 const errorHandler = require('./core/errors/errorHandler');
 const { rawBodyForWebhooks } = require('./middlewares/rawBodyForWebhooks');
 
-// Webhook handlers (they expect raw body)
 const webhookRoutes = require('./features/webhooks/webhooks.routes');
 
 const app = express();
 
 const startServer = async () => {
-  // --- CONNECT DATABASE ---
   await connectDB();
 
-  // --- SECURITY MIDDLEWARE ---
   app.use(helmet());
   app.use(
     cors({
@@ -28,9 +25,6 @@ const startServer = async () => {
     })
   );
 
-  /* -------------------------------------------------------------
-     WEBHOOK ROUTES (RAW BODY MUST COME BEFORE express.json)
-  ------------------------------------------------------------- */
   app.post('/api/webhooks/stripe', rawBodyForWebhooks, webhookRoutes.stripe);
 
   app.post(
@@ -39,29 +33,18 @@ const startServer = async () => {
     webhookRoutes.razorpay
   );
 
-  /* -------------------------------------------------------------
-     STANDARD JSON PARSER — AFTER WEBHOOKS
-  ------------------------------------------------------------- */
   app.use(express.json({ limit: '2mb' }));
 
-  /* -------------------------------------------------------------
-     FEATURE ROUTES
-  ------------------------------------------------------------- */
   app.use('/api/auth', require('./features/auth/auth.routes'));
   app.use('/api/products', require('./features/products/products.routes'));
   app.use('/api/orders', require('./features/orders/orders.routes'));
   app.use('/api/payments', require('./features/payments/payments.routes'));
   app.use('/api/users', require('./features/users/users.routes'));
   app.use('/api/shipping', require('./features/shipping/shipping.routes'));
+  app.use('/api/cart', require('./features/cart/cart.routes'));
 
-  /* -------------------------------------------------------------
-     HEALTH CHECK
-  ------------------------------------------------------------- */
   app.get('/', (req, res) => res.send('Zaynarah API - Feature Based'));
 
-  /* -------------------------------------------------------------
-     GLOBAL ERROR HANDLER (MUST BE LAST)
-  ------------------------------------------------------------- */
   app.use(errorHandler);
 
   // --- START SERVER ---
