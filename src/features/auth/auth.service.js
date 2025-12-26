@@ -1,7 +1,9 @@
+// backend/src/features/auth/auth.service.js
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../users/users.model');
 const ApiError = require('../../core/errors/ApiError');
+const { sendVerificationEmail } = require('../../services/mailer.service');
 
 function signToken(id) {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -9,9 +11,6 @@ function signToken(id) {
   });
 }
 
-/* =========================
-   REGISTER
-========================= */
 exports.register = async ({ name, email, password }) => {
   const exists = await User.findOne({ email });
   if (exists) throw new ApiError(400, 'Email already registered');
@@ -24,21 +23,15 @@ exports.register = async ({ name, email, password }) => {
     password,
     emailVerified: false,
     emailVerifyToken,
+    emailVerifyTokenExpires: Date.now() + 24 * 60 * 60 * 1000,
   });
 
-  const token = signToken(user.id);
+  await sendVerificationEmail({ to: user.email, token: emailVerifyToken });
 
-  // NOTE: Email sending can be added later
-  return {
-    user,
-    token,
-    emailVerifyToken, // useful for now (manual testing / frontend)
-  };
+  const token = signToken(user.id);
+  return { user, token };
 };
 
-/* =========================
-   LOGIN
-========================= */
 exports.login = async ({ email, password }) => {
   const user = await User.findOne({ email }).select('+password');
   if (!user) throw new ApiError(400, 'Invalid credentials');
@@ -50,34 +43,35 @@ exports.login = async ({ email, password }) => {
   return { user, token };
 };
 
-/* =========================
-   VERIFY EMAIL (MANUAL)
-========================= */
 exports.verifyEmail = async (token) => {
-  if (!token) throw new ApiError(400, 'Verification token required');
+  const user = await User.findOne({
+    emailVerifyToken: token,
+    emailVerifyTokenExpires: { $gt: Date.now() },
+  });
 
-  const user = await User.findOne({ emailVerifyToken: token });
-  if (!user) throw new ApiError(400, 'Invalid or expired verification token');
+  if (!user) throw new ApiError(400, 'Invalid or expired verification link');
 
   user.emailVerified = true;
   user.emailVerifyToken = undefined;
+  user.emailVerifyTokenExpires = undefined;
   await user.save();
 
   return true;
 };
 
-/* =========================
-   RESEND VERIFICATION
-========================= */
 exports.resendVerification = async (userId) => {
   const user = await User.findById(userId);
   if (!user) throw new ApiError(404, 'User not found');
-
   if (user.emailVerified) return true;
 
   user.emailVerifyToken = crypto.randomBytes(32).toString('hex');
+  user.emailVerifyTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
   await user.save();
 
-  // NOTE: Email sending hook goes here later
+  await sendVerificationEmail({
+    to: user.email,
+    token: user.emailVerifyToken,
+  });
+
   return true;
 };
