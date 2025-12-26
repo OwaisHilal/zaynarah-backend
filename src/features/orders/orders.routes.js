@@ -15,7 +15,16 @@ const {
   paymentFailedSchema,
 } = require('./orders.validation');
 
-// Checkout lifecycle
+/* ======================
+   USER ROUTES (FIRST)
+====================== */
+
+router.get('/my-orders', requireLogin, ctrl.myOrders);
+
+/* ======================
+   CHECKOUT LIFECYCLE
+====================== */
+
 router.post(
   '/checkout/session/init',
   requireLogin,
@@ -45,13 +54,16 @@ router.post(
   ctrl.create
 );
 
-// Get order by id
+/* ======================
+   ORDER ACCESS
+====================== */
+
 router.get('/:id', requireLogin, validate({ params: idParamSchema }), ctrl.get);
 
-// User orders
-router.get('/my-orders', requireLogin, ctrl.myOrders);
+/* ======================
+   ADMIN
+====================== */
 
-// Admin list / update
 router.get('/', requireLogin, requireAdmin, ctrl.listAdmin);
 
 router.put(
@@ -62,13 +74,17 @@ router.put(
   ctrl.updateStatus
 );
 
-// Payment callbacks (frontend may call)
+/* ======================
+   PAYMENT CALLBACKS
+====================== */
+
 router.post(
   '/confirm-payment',
   requireLogin,
   validate({ body: confirmPaymentSchema }),
   ctrl.confirmPayment
 );
+
 router.post(
   '/payment-failed',
   requireLogin,

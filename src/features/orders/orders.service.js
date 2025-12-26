@@ -5,14 +5,7 @@ const Cart = require('../cart/cart.model');
 const ApiError = require('../../core/errors/ApiError');
 const { nanoid } = require('nanoid');
 
-/**
- * Orders service: handles checkout session init -> finalize pricing -> create draft -> mark paid/failed
- */
 module.exports = {
-  /**
-   * Create a checkout session from the current user's cart.
-   * Returns { checkoutSessionId, items, subtotal, orderId }
-   */
   initSessionFromCart: async (userId) => {
     const cart = await Cart.findOne({ user: userId }).populate('items.product');
     if (!cart || !cart.items || !cart.items.length) {
@@ -31,7 +24,6 @@ module.exports = {
       };
     });
 
-    // stock sanity check
     for (const it of cart.items) {
       if (!it.product) throw new ApiError(400, 'Product not found in cart');
       if (it.product.stock != null && it.quantity > it.product.stock) {
@@ -74,10 +66,6 @@ module.exports = {
     };
   },
 
-  /**
-   * finalizePricing: calculates shipping / tax and updates order totals
-   * payload: { checkoutSessionId, shippingAddress, billingAddress, shippingMethod, weight, itemsCount }
-   */
   finalizePricing: async (
     userId,
     {
@@ -115,17 +103,13 @@ module.exports = {
       shippingCost = Number(map[shippingMethod] || 0);
     }
 
-    // Apply weight-based multiplier and postal surcharges (advanced)
     if (weight > 0) {
-      // every 500g increment adds 10% of base shipping cost
       const increments = Math.floor(weight / 500);
       shippingCost += Math.round(shippingCost * 0.1 * increments);
     }
 
-    // small postalCode surcharge example (remote areas)
     const pcode = (shippingAddress?.postalCode || '').toString();
     if (pcode && /^9/.test(pcode)) {
-      // example: postal codes starting with 9 have +50 surcharge
       shippingCost += 50;
     }
 
@@ -165,10 +149,6 @@ module.exports = {
     };
   },
 
-  /**
-   * createDraftOrder: mark payment method/provider and return order
-   * params: { checkoutSessionId, paymentGateway }
-   */
   createDraftOrder: async (userId, { checkoutSessionId, paymentGateway }) => {
     if (!checkoutSessionId)
       throw new ApiError(400, 'checkoutSessionId required');
@@ -183,9 +163,6 @@ module.exports = {
     return order.toObject();
   },
 
-  /**
-   * createOrder: used if frontend submits full checkout payload (fallback)
-   */
   createOrder: async (userId, payload = {}) => {
     const {
       items = [],
@@ -270,10 +247,6 @@ module.exports = {
     return order;
   },
 
-  /**
-   * Mark order as paid: deduct stock, update payment fields and status
-   * params: { paymentIntentId, gateway }
-   */
   markPaid: async (
     orderId,
     { paymentIntentId = null, gateway = null } = {}
@@ -281,7 +254,6 @@ module.exports = {
     const order = await Order.findById(orderId);
     if (!order) throw new ApiError(404, 'Order not found');
 
-    // Deduct stock for each item (best-effort)
     for (const item of order.items || []) {
       try {
         if (!item.productId) continue;
@@ -307,7 +279,6 @@ module.exports = {
     order.paidAt = new Date();
     await order.save();
 
-    // Clear cart for the user (best-effort)
     try {
       await Cart.findOneAndUpdate({ user: order.user }, { items: [] });
     } catch (err) {
@@ -317,14 +288,10 @@ module.exports = {
     return order.toObject();
   },
 
-  /**
-   * Mark order as failed: restore stock and annotate metadata
-   */
   markFailed: async (orderId, reason = 'payment_failed') => {
     const order = await Order.findById(orderId);
     if (!order) throw new ApiError(404, 'Order not found');
 
-    // Restore stock back
     for (const item of order.items || []) {
       try {
         if (!item.productId) continue;

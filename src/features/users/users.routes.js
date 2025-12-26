@@ -15,7 +15,6 @@ const {
 // -------------------------
 // AUTH / PROFILE
 // -------------------------
-router.post('/register', validate(registerSchema), userCtrl.register);
 
 router.get('/me', requireLogin, userCtrl.profile);
 router.put(

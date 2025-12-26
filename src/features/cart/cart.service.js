@@ -4,8 +4,6 @@ const Product = require('../products/products.model');
 const ApiError = require('../../core/errors/ApiError');
 const mongoose = require('mongoose');
 
-// Service NEVER normalizes. It returns raw mongoose docs.
-
 module.exports = {
   // -------------------------------------------------
   // GET CART

@@ -83,7 +83,7 @@ const orderSchema = new mongoose.Schema(
       enum: ['stripe', 'razorpay', null],
       default: null,
     },
-    paymentIntentId: String, // store provider order / intent id (stripe session id / razorpay order id / payment id)
+    paymentIntentId: String,
     paymentStatus: {
       type: String,
       enum: ['pending', 'paid', 'failed'],

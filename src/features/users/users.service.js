@@ -1,7 +1,6 @@
 // src/features/users/users.service.js
 const User = require('./users.model');
 const ApiError = require('../../core/errors/ApiError');
-const mongoose = require('mongoose');
 
 module.exports = {
   createUser: async ({ name, email, password }) => {
