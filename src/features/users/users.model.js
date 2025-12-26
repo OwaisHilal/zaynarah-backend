@@ -31,6 +31,10 @@ const UserSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, trim: true },
     password: { type: String, required: true, minlength: 6 },
     role: { type: String, enum: ['customer', 'admin'], default: 'customer' },
+
+    emailVerified: { type: Boolean, default: false },
+    emailVerifyToken: { type: String },
+
     addresses: [AddressSchema],
   },
   { timestamps: true }

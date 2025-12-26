@@ -9,5 +9,7 @@ const { loginSchema } = require('./auth.validation');
 router.post('/register', validate(registerSchema), authCtrl.register);
 router.post('/login', validate(loginSchema), authCtrl.login);
 router.get('/me', requireLogin, authCtrl.me);
+router.get('/email/verify', authCtrl.verifyEmail);
+router.post('/email/resend', requireLogin, authCtrl.resendVerification);
 
 module.exports = router;
