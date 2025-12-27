@@ -5,7 +5,6 @@ const ctrl = require('./orders.controller');
 const { requireLogin, requireAdmin } = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
 const {
-  createOrderSchema,
   updateStatusSchema,
   idParamSchema,
   initSessionSchema,
@@ -16,7 +15,7 @@ const {
 } = require('./orders.validation');
 
 /* ======================
-   USER ROUTES (FIRST)
+   USER ROUTES
 ====================== */
 
 router.get('/my-orders', requireLogin, ctrl.myOrders);
@@ -46,13 +45,16 @@ router.post(
   ctrl.createDraft
 );
 
-// Manual create (fallback)
-router.post(
-  '/create',
-  requireLogin,
-  validate({ body: createOrderSchema }),
-  ctrl.create
-);
+/* ======================
+   DEPRECATED ROUTES
+====================== */
+
+router.post('/create', requireLogin, (_req, res) => {
+  return res.status(410).json({
+    message:
+      'Order creation via /orders/create is deprecated. Use checkout session flow instead.',
+  });
+});
 
 /* ======================
    ORDER ACCESS

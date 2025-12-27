@@ -1,9 +1,7 @@
-//src/features/payments/payments.controller.js
+// src/features/payments/payments.controller.js
 const Order = require('../orders/orders.model');
 const paymentService = require('../../services/payment.service');
 const ordersService = require('../orders/orders.service');
-
-/* ========================= STRIPE ========================= */
 
 exports.createStripeCheckoutSession = async (req, res, next) => {
   try {
@@ -13,16 +11,11 @@ exports.createStripeCheckoutSession = async (req, res, next) => {
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    // DEV MODE — no Stripe keys yet
-    if (!process.env.STRIPE_SECRET_KEY) {
-      order.paymentProvider = 'stripe';
-      order.paymentIntentId = `dev_stripe_${order._id}`;
-      await order.save();
-
+    if (order.paymentIntentId) {
       return res.json({
         sessionId: order.paymentIntentId,
-        publishableKey: 'dev',
-        dev: true,
+        publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || 'dev',
+        reused: true,
       });
     }
 
@@ -38,23 +31,21 @@ exports.createStripeCheckoutSession = async (req, res, next) => {
 
     res.json({
       sessionId: session.id,
-      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || 'dev',
     });
   } catch (err) {
     next(err);
   }
 };
 
-exports.createStripePaymentIntent = async (req, res) => {
-  // Optional flow – keep simple for now
-  res.status(501).json({ message: 'Stripe PaymentIntent not enabled yet' });
-};
-
 exports.verifyStripePayment = async (req, res) => {
   const { orderId } = req.body;
 
-  // DEV MODE → auto-success
-  if (!process.env.STRIPE_SECRET_KEY && orderId) {
+  if (!orderId) {
+    return res.status(400).json({ message: 'orderId required' });
+  }
+
+  if (!process.env.STRIPE_SECRET_KEY) {
     await ordersService.markPaid(orderId, {
       gateway: 'stripe',
       paymentIntentId: 'dev',
@@ -62,10 +53,8 @@ exports.verifyStripePayment = async (req, res) => {
     return res.json({ success: true, dev: true });
   }
 
-  res.status(501).json({ message: 'Stripe verification not enabled yet' });
+  res.status(501).json({ message: 'Stripe verification not implemented' });
 };
-
-/* ======================== RAZORPAY ======================== */
 
 exports.createRazorpayOrder = async (req, res, next) => {
   try {
@@ -75,18 +64,11 @@ exports.createRazorpayOrder = async (req, res, next) => {
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    // DEV MODE — no Razorpay keys
-    if (!process.env.RAZORPAY_KEY_ID) {
-      order.paymentProvider = 'razorpay';
-      order.paymentIntentId = `dev_rp_${order._id}`;
-      await order.save();
-
+    if (order.paymentIntentId) {
       return res.json({
         orderId: order.paymentIntentId,
-        key: 'dev',
-        amount: order.cartTotal.grand * 100,
-        currency: order.cartTotal.currency || 'INR',
-        dev: true,
+        key: process.env.RAZORPAY_KEY_ID || 'dev',
+        reused: true,
       });
     }
 
@@ -98,7 +80,7 @@ exports.createRazorpayOrder = async (req, res, next) => {
 
     res.json({
       orderId: rpOrder.id,
-      key: process.env.RAZORPAY_KEY_ID,
+      key: process.env.RAZORPAY_KEY_ID || 'dev',
       amount: rpOrder.amount,
       currency: rpOrder.currency,
     });
@@ -110,8 +92,11 @@ exports.createRazorpayOrder = async (req, res, next) => {
 exports.verifyRazorpaySignature = async (req, res) => {
   const { orderId } = req.body;
 
-  // DEV MODE → auto-success
-  if (!process.env.RAZORPAY_KEY_ID && orderId) {
+  if (!orderId) {
+    return res.status(400).json({ message: 'orderId required' });
+  }
+
+  if (!process.env.RAZORPAY_KEY_ID) {
     await ordersService.markPaid(orderId, {
       gateway: 'razorpay',
       paymentIntentId: 'dev',
@@ -119,10 +104,8 @@ exports.verifyRazorpaySignature = async (req, res) => {
     return res.json({ success: true, dev: true });
   }
 
-  res.status(501).json({ message: 'Razorpay verification not enabled yet' });
+  res.status(501).json({ message: 'Razorpay verification not implemented' });
 };
-
-/* ======================== COMMON ========================== */
 
 exports.getPaymentStatus = async (req, res) => {
   res.json({ status: 'pending' });

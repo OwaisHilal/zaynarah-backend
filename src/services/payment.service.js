@@ -25,34 +25,14 @@ const razorpay = isRazorpayLive
     })
   : null;
 
-function resolveAmount(order) {
-  if (!order) throw new ApiError(400, 'Order missing');
-
-  const itemsTotal = (order.items || []).reduce((sum, item) => {
-    const price = Number(item.price || 0);
-    const qty = Number(item.qty || item.quantity || 1);
-    return sum + price * qty;
-  }, 0);
-
-  if (!itemsTotal || isNaN(itemsTotal) || itemsTotal <= 0) {
-    throw new ApiError(400, 'Order items total is invalid');
+function resolveFinalAmount(order) {
+  if (!order || !order.cartTotal) {
+    throw new ApiError(400, 'Order pricing not finalized');
   }
 
-  const shipping =
-    typeof order?.cartTotal === 'object'
-      ? Number(order.cartTotal.shipping || 0)
-      : 0;
-
-  const tax =
-    typeof order?.cartTotal === 'object' ? Number(order.cartTotal.tax || 0) : 0;
-
-  const grand =
-    typeof order?.cartTotal === 'object' && Number(order.cartTotal.grand) > 0
-      ? Number(order.cartTotal.grand)
-      : itemsTotal + shipping + tax;
-
+  const grand = Number(order.cartTotal.grand);
   if (!grand || isNaN(grand) || grand <= 0) {
-    throw new ApiError(400, 'Order total amount is invalid');
+    throw new ApiError(400, 'Invalid order total');
   }
 
   return Math.round(grand * 100);
@@ -65,6 +45,9 @@ exports.createStripeCheckoutSession = async ({
 }) => {
   if (!order) throw new ApiError(400, 'Order missing');
 
+  const amountPaise = resolveFinalAmount(order);
+  const currency = (order.cartTotal.currency || 'INR').toLowerCase();
+
   if (!stripe) {
     return {
       id: `dev_stripe_${order._id}`,
@@ -72,21 +55,21 @@ exports.createStripeCheckoutSession = async ({
     };
   }
 
-  const lineItems = (order.items || []).map((item) => ({
-    price_data: {
-      currency: (order.cartTotal?.currency || 'INR').toLowerCase(),
-      product_data: {
-        name: item.title || item.name || 'Product',
-      },
-      unit_amount: Math.round((item.price || 0) * 100),
-    },
-    quantity: item.qty || 1,
-  }));
-
   return stripe.checkout.sessions.create({
-    payment_method_types: ['card'],
     mode: 'payment',
-    line_items: lineItems,
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price_data: {
+          currency,
+          product_data: {
+            name: `Order ${order._id}`,
+          },
+          unit_amount: amountPaise,
+        },
+        quantity: 1,
+      },
+    ],
     success_url,
     cancel_url,
     metadata: {
@@ -98,20 +81,21 @@ exports.createStripeCheckoutSession = async ({
 exports.createRazorpayOrder = async (order) => {
   if (!order) throw new ApiError(400, 'Order missing');
 
-  const amountPaise = resolveAmount(order);
+  const amountPaise = resolveFinalAmount(order);
+  const currency = (order.cartTotal.currency || 'INR').toUpperCase();
 
   if (!razorpay) {
     return {
       id: `dev_rp_${order._id}`,
       amount: amountPaise,
-      currency: order.cartTotal?.currency || 'INR',
+      currency,
       dev: true,
     };
   }
 
   return razorpay.orders.create({
     amount: amountPaise,
-    currency: (order.cartTotal?.currency || 'INR').toUpperCase(),
+    currency,
     receipt: order._id.toString(),
     payment_capture: 1,
     notes: {

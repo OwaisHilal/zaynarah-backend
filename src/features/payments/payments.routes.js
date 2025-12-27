@@ -5,13 +5,7 @@ const router = express.Router();
 const ctrl = require('./payments.controller');
 const { requireLogin } = require('../../middlewares/auth');
 
-// match frontend names
 router.post('/stripe-session', requireLogin, ctrl.createStripeCheckoutSession);
-router.post(
-  '/stripe-payment-intent',
-  requireLogin,
-  ctrl.createStripePaymentIntent
-);
 router.post('/stripe-verify', requireLogin, ctrl.verifyStripePayment);
 
 router.post('/razorpay-order', requireLogin, ctrl.createRazorpayOrder);

@@ -6,6 +6,10 @@ const objectIdString = z
   .length(24, 'Invalid id')
   .regex(/^[0-9a-fA-F]{24}$/, 'Invalid id');
 
+/* ======================
+   ADDRESS
+====================== */
+
 const addressSchema = z.object({
   fullName: z.string().min(1),
   phone: z.string().min(5),
@@ -18,7 +22,12 @@ const addressSchema = z.object({
   country: z.string().min(1),
 });
 
-const fullShippingMethodSchema = z.object({
+/* ======================
+   SHIPPING METHOD
+   (Normalized – backend authority)
+====================== */
+
+const shippingMethodSchema = z.object({
   _id: z.string().min(1),
   label: z.string().min(1),
   cost: z.number().min(0),
@@ -27,46 +36,9 @@ const fullShippingMethodSchema = z.object({
   metadata: z.record(z.any()).optional(),
 });
 
-const minimalShippingMethodSchema = z.object({
-  _id: z.string().min(1),
-  cost: z.number().min(0),
-});
-
-const shippingMethodSchema = z.union([
-  fullShippingMethodSchema,
-  minimalShippingMethodSchema,
-]);
-
-const orderItemSchema = z.object({
-  productId: objectIdString,
-  title: z.string().optional(),
-  name: z.string().optional(),
-  price: z.number().min(0),
-  qty: z.number().int().min(1),
-  image: z.string().optional(),
-  sku: z.string().optional(),
-});
-
-const cartTotalObjectSchema = z.object({
-  items: z.number().min(0),
-  shipping: z.number().min(0),
-  tax: z.number().min(0),
-  grand: z.number().min(0),
-  currency: z.string().optional().default('INR'),
-});
-
-const cartTotalSchema = z.union([cartTotalObjectSchema, z.number().min(0)]);
-
-const createOrderSchema = z.object({
-  items: z.array(orderItemSchema).min(1),
-  cartTotal: cartTotalSchema,
-  shippingAddress: addressSchema,
-  billingAddress: addressSchema.optional(),
-  shippingMethod: shippingMethodSchema,
-  paymentMethod: z.enum(['stripe', 'razorpay']),
-  paymentDetails: z.any().optional(),
-  metadata: z.any().optional(),
-});
+/* ======================
+   SESSION CHECKOUT
+====================== */
 
 const initSessionSchema = z.object({});
 
@@ -84,6 +56,10 @@ const createDraftSchema = z.object({
   paymentGateway: z.enum(['stripe', 'razorpay']),
 });
 
+/* ======================
+   PAYMENT
+====================== */
+
 const confirmPaymentSchema = z.object({
   orderId: objectIdString,
   paymentIntentId: z.string().min(1),
@@ -95,19 +71,28 @@ const paymentFailedSchema = z.object({
   reason: z.string().min(1),
 });
 
+/* ======================
+   PARAMS / ADMIN
+====================== */
+
 const idParamSchema = z.object({
   id: objectIdString,
 });
 
+const updateStatusSchema = z.object({
+  status: z.enum(['draft', 'pending', 'paid', 'failed', 'cancelled']),
+});
+
 module.exports = {
-  createOrderSchema,
-  updateStatusSchema: z.object({
-    status: z.enum(['draft', 'pending', 'paid', 'failed', 'cancelled']),
-  }),
-  idParamSchema,
   initSessionSchema,
   finalizePricingSchema,
   createDraftSchema,
+
+  // payments
   confirmPaymentSchema,
   paymentFailedSchema,
+
+  // admin / access
+  idParamSchema,
+  updateStatusSchema,
 };

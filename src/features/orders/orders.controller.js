@@ -1,24 +1,28 @@
 // src/features/orders/orders.controller.js
 const ordersService = require('./orders.service');
-const ApiError = require('../../core/errors/ApiError');
+
+/* =====================================================
+   🚫 LEGACY ORDER CREATION (DISABLED)
+===================================================== */
+
+async function legacyCreateDisabled(req, res) {
+  return res.status(410).json({
+    message:
+      'Direct order creation is disabled. Use checkout session flow instead.',
+  });
+}
 
 module.exports = {
-  // Create full order (fallback if frontend posts everything)
-  create: async (req, res, next) => {
-    try {
-      const userId = req.user && req.user._id;
-      if (!userId)
-        return res.status(401).json({ message: 'Authentication required' });
+  /* =====================================================
+     ❌ LEGACY (INTENTIONALLY DISABLED)
+  ===================================================== */
 
-      const payload = req.validatedBody || req.body || {};
-      const order = await ordersService.createOrder(userId, payload);
-      return res.status(201).json(order);
-    } catch (err) {
-      next(err);
-    }
-  },
+  create: legacyCreateDisabled,
 
-  // Get order (owner or admin)
+  /* =====================================================
+     🔐 ORDER ACCESS
+  ===================================================== */
+
   get: async (req, res, next) => {
     try {
       const id = req.validatedParams?.id || req.params.id;
@@ -37,7 +41,19 @@ module.exports = {
     }
   },
 
-  // Admin listing
+  myOrders: async (req, res, next) => {
+    try {
+      const orders = await ordersService.listForUser(req.user._id);
+      res.json(orders);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  /* =====================================================
+     🧾 ADMIN
+  ===================================================== */
+
   listAdmin: async (req, res, next) => {
     try {
       if (req.user.role !== 'admin')
@@ -51,14 +67,13 @@ module.exports = {
     }
   },
 
-  // Admin update status
   updateStatus: async (req, res, next) => {
     try {
       if (req.user.role !== 'admin')
         return res.status(403).json({ message: 'Admin required' });
 
       const id = req.validatedParams?.id || req.params.id;
-      const { status } = req.validatedBody || req.body;
+      const { status } = req.validatedBody;
       const order = await ordersService.updateStatus(id, status);
       res.json(order);
     } catch (err) {
@@ -66,86 +81,60 @@ module.exports = {
     }
   },
 
-  // Get current user's orders
-  myOrders: async (req, res, next) => {
-    try {
-      const userId = req.user._id;
-      const orders = await ordersService.listForUser(userId);
-      res.json(orders);
-    } catch (err) {
-      next(err);
-    }
-  },
+  /* =====================================================
+     🧠 CHECKOUT SESSION LIFECYCLE
+  ===================================================== */
 
-  // Checkout lifecycle endpoints
-
-  // POST /orders/checkout/session/init
   initSession: async (req, res, next) => {
     try {
-      const userId = req.user._id;
-      const session = await ordersService.initSessionFromCart(userId);
+      const session = await ordersService.initSessionFromCart(req.user._id);
       res.json(session);
     } catch (err) {
       next(err);
     }
   },
 
-  // POST /orders/checkout/session/finalize-pricing
   finalizePricing: async (req, res, next) => {
     try {
-      const userId = req.user._id;
-      const payload = req.validatedBody || req.body || {};
-      const result = await ordersService.finalizePricing(userId, payload);
+      const result = await ordersService.finalizePricing(
+        req.user._id,
+        req.validatedBody
+      );
       res.json(result);
     } catch (err) {
       next(err);
     }
   },
 
-  // POST /orders/create-draft
   createDraft: async (req, res, next) => {
     try {
-      const userId = req.user._id;
-      const { checkoutSessionId, paymentGateway } =
-        req.validatedBody || req.body || {};
-      if (!checkoutSessionId)
-        return res.status(400).json({ message: 'checkoutSessionId required' });
+      const { checkoutSessionId, paymentGateway } = req.validatedBody;
 
-      const order = await ordersService.createDraftOrder(userId, {
+      const order = await ordersService.createDraftOrder(req.user._id, {
         checkoutSessionId,
         paymentGateway,
       });
+
       res.json(order);
     } catch (err) {
       next(err);
     }
   },
 
-  // Manual confirm (frontend-callable)
-  confirmPayment: async (req, res, next) => {
-    try {
-      const { orderId, paymentIntentId, gateway } =
-        req.validatedBody || req.body;
-      if (!orderId)
-        return res.status(400).json({ message: 'orderId required' });
+  /* =====================================================
+     🔒 PAYMENT CONFIRMATION (SERVER-ONLY)
+  ===================================================== */
 
-      const order = await ordersService.markPaid(orderId, {
-        paymentIntentId,
-        gateway,
-      });
-
-      res.json(order);
-    } catch (err) {
-      next(err);
-    }
+  confirmPayment: async (req, res) => {
+    return res.status(403).json({
+      message:
+        'Direct payment confirmation is disabled. Payments are verified server-side.',
+    });
   },
 
   paymentFailed: async (req, res, next) => {
     try {
-      const { orderId, reason } = req.validatedBody || req.body;
-      if (!orderId)
-        return res.status(400).json({ message: 'orderId required' });
-
+      const { orderId, reason } = req.validatedBody;
       const order = await ordersService.markFailed(
         orderId,
         reason || 'payment_failed'

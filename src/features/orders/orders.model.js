@@ -18,10 +18,10 @@ const addressSchema = new mongoose.Schema(
 
 const shippingMethodSchema = new mongoose.Schema(
   {
-    _id: { type: String }, // shipping service id returned by shipping provider
+    _id: String,
     label: String,
     cost: { type: Number, default: 0 },
-    deliveryEstimate: String, // "Arrives by Tuesday"
+    deliveryEstimate: String,
     carrier: String,
     metadata: { type: Object, default: {} },
   },
@@ -36,8 +36,8 @@ const itemSchema = new mongoose.Schema(
       required: true,
     },
     title: String,
-    price: Number,
-    qty: Number,
+    price: { type: Number, required: true },
+    qty: { type: Number, required: true },
     image: String,
     sku: String,
   },
@@ -57,13 +57,27 @@ const cartTotalSchema = new mongoose.Schema(
 
 const orderSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
 
-    checkoutSessionId: { type: String, unique: true, sparse: true },
+    checkoutSessionId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
 
-    items: [itemSchema],
+    items: {
+      type: [itemSchema],
+      required: true,
+      validate: [(v) => v.length > 0, 'Order must contain items'],
+    },
 
-    cartTotal: cartTotalSchema,
+    cartTotal: { type: cartTotalSchema, required: true },
 
     shippingAddress: addressSchema,
     billingAddress: addressSchema,
@@ -74,31 +88,37 @@ const orderSchema = new mongoose.Schema(
       type: String,
       enum: ['stripe', 'razorpay'],
       required: true,
-      default: 'stripe',
     },
+
     paymentDetails: { type: Object, default: {} },
 
     paymentProvider: {
       type: String,
-      enum: ['stripe', 'razorpay', null],
-      default: null,
+      enum: ['stripe', 'razorpay'],
     },
-    paymentIntentId: String,
+
+    paymentIntentId: {
+      type: String,
+      index: true,
+    },
+
     paymentStatus: {
       type: String,
       enum: ['pending', 'paid', 'failed'],
       default: 'pending',
+      index: true,
     },
 
     status: {
       type: String,
       enum: ['draft', 'pending', 'paid', 'failed', 'cancelled'],
       default: 'pending',
+      index: true,
     },
 
     metadata: { type: Object, default: {} },
 
-    paidAt: { type: Date },
+    paidAt: Date,
   },
   { timestamps: true }
 );
