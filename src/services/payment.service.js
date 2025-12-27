@@ -1,43 +1,61 @@
-// src/services/payment.service.js
-
+// backend/src/services/payment.service.js
 const Stripe = require('stripe');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const ApiError = require('../core/errors/ApiError');
 
-const stripe =
+const isStripeLive =
   process.env.STRIPE_SECRET_KEY &&
-  process.env.STRIPE_SECRET_KEY.startsWith('sk_')
-    ? new Stripe(process.env.STRIPE_SECRET_KEY, {
-        apiVersion: '2022-11-15',
-      })
-    : null;
+  process.env.STRIPE_SECRET_KEY.startsWith('sk_');
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'dev',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || 'dev',
-});
+const stripe = isStripeLive
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2022-11-15',
+    })
+  : null;
+
+const isRazorpayLive =
+  Boolean(process.env.RAZORPAY_KEY_ID) &&
+  Boolean(process.env.RAZORPAY_KEY_SECRET);
+
+const razorpay = isRazorpayLive
+  ? new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    })
+  : null;
 
 function resolveAmount(order) {
   if (!order) throw new ApiError(400, 'Order missing');
 
-  // Prefer finalized totals
-  let amount = Number(order?.cartTotal?.grand);
+  const itemsTotal = (order.items || []).reduce((sum, item) => {
+    const price = Number(item.price || 0);
+    const qty = Number(item.qty || item.quantity || 1);
+    return sum + price * qty;
+  }, 0);
 
-  // Fallback: calculate from items
-  if (!amount || isNaN(amount) || amount <= 0) {
-    amount = (order.items || []).reduce((sum, item) => {
-      return (
-        sum + Number(item.price || 0) * Number(item.qty || item.quantity || 1)
-      );
-    }, 0);
+  if (!itemsTotal || isNaN(itemsTotal) || itemsTotal <= 0) {
+    throw new ApiError(400, 'Order items total is invalid');
   }
 
-  if (!amount || isNaN(amount) || amount <= 0) {
+  const shipping =
+    typeof order?.cartTotal === 'object'
+      ? Number(order.cartTotal.shipping || 0)
+      : 0;
+
+  const tax =
+    typeof order?.cartTotal === 'object' ? Number(order.cartTotal.tax || 0) : 0;
+
+  const grand =
+    typeof order?.cartTotal === 'object' && Number(order.cartTotal.grand) > 0
+      ? Number(order.cartTotal.grand)
+      : itemsTotal + shipping + tax;
+
+  if (!grand || isNaN(grand) || grand <= 0) {
     throw new ApiError(400, 'Order total amount is invalid');
   }
 
-  return Math.round(amount * 100); // convert to paise
+  return Math.round(grand * 100);
 }
 
 exports.createStripeCheckoutSession = async ({
@@ -47,7 +65,6 @@ exports.createStripeCheckoutSession = async ({
 }) => {
   if (!order) throw new ApiError(400, 'Order missing');
 
-  /* ---------- DEV MODE (NO STRIPE KEYS) ---------- */
   if (!stripe) {
     return {
       id: `dev_stripe_${order._id}`,
@@ -83,8 +100,7 @@ exports.createRazorpayOrder = async (order) => {
 
   const amountPaise = resolveAmount(order);
 
-  /* ---------- DEV MODE (NO RAZORPAY KEYS) ---------- */
-  if (!process.env.RAZORPAY_KEY_ID) {
+  if (!razorpay) {
     return {
       id: `dev_rp_${order._id}`,
       amount: amountPaise,
@@ -108,7 +124,7 @@ exports.verifyRazorpaySignature = (orderId, paymentId, signature) => {
   if (!orderId || !paymentId || !signature) return false;
 
   const generated = crypto
-    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'dev')
+    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
     .update(`${orderId}|${paymentId}`)
     .digest('hex');
 

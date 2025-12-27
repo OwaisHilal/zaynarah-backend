@@ -1,4 +1,4 @@
-// src/orders/orders.validation.js
+// backend/src/features/orders/orders.validation.js
 const { z } = require('zod');
 
 const objectIdString = z
@@ -9,7 +9,7 @@ const objectIdString = z
 const addressSchema = z.object({
   fullName: z.string().min(1),
   phone: z.string().min(5),
-  email: z.string().email(),
+  email: z.string().email().optional(),
   addressLine1: z.string().min(1),
   addressLine2: z.string().optional().default(''),
   city: z.string().min(1),
@@ -18,7 +18,7 @@ const addressSchema = z.object({
   country: z.string().min(1),
 });
 
-const shippingMethodSchema = z.object({
+const fullShippingMethodSchema = z.object({
   _id: z.string().min(1),
   label: z.string().min(1),
   cost: z.number().min(0),
@@ -26,6 +26,16 @@ const shippingMethodSchema = z.object({
   carrier: z.string().optional(),
   metadata: z.record(z.any()).optional(),
 });
+
+const minimalShippingMethodSchema = z.object({
+  _id: z.string().min(1),
+  cost: z.number().min(0),
+});
+
+const shippingMethodSchema = z.union([
+  fullShippingMethodSchema,
+  minimalShippingMethodSchema,
+]);
 
 const orderItemSchema = z.object({
   productId: objectIdString,
@@ -37,7 +47,7 @@ const orderItemSchema = z.object({
   sku: z.string().optional(),
 });
 
-const cartTotalSchema = z.object({
+const cartTotalObjectSchema = z.object({
   items: z.number().min(0),
   shipping: z.number().min(0),
   tax: z.number().min(0),
@@ -45,12 +55,14 @@ const cartTotalSchema = z.object({
   currency: z.string().optional().default('INR'),
 });
 
+const cartTotalSchema = z.union([cartTotalObjectSchema, z.number().min(0)]);
+
 const createOrderSchema = z.object({
   items: z.array(orderItemSchema).min(1),
   cartTotal: cartTotalSchema,
   shippingAddress: addressSchema,
   billingAddress: addressSchema.optional(),
-  shippingMethod: shippingMethodSchema.optional(),
+  shippingMethod: shippingMethodSchema,
   paymentMethod: z.enum(['stripe', 'razorpay']),
   paymentDetails: z.any().optional(),
   metadata: z.any().optional(),
@@ -62,7 +74,7 @@ const finalizePricingSchema = z.object({
   checkoutSessionId: z.string().min(1),
   shippingAddress: addressSchema,
   billingAddress: addressSchema.optional(),
-  shippingMethod: shippingMethodSchema.optional(),
+  shippingMethod: shippingMethodSchema,
   weight: z.number().min(0).optional().default(0),
   itemsCount: z.number().int().min(0).optional().default(0),
 });

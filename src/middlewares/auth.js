@@ -1,4 +1,4 @@
-// src/middlewares/auth.js
+// backend/src/middlewares/auth.js
 const jwt = require('jsonwebtoken');
 const User = require('../features/users/users.model');
 
@@ -11,7 +11,11 @@ async function requireLogin(req, res, next) {
     const token = header.split(' ')[1];
     const payload = jwt.verify(token, process.env.JWT_SECRET);
 
-    const user = await User.findById(payload.id).select('-password');
+    const userId = payload.id || payload._id;
+    if (!userId)
+      return res.status(401).json({ message: 'Invalid token payload' });
+
+    const user = await User.findById(userId).select('-password');
     if (!user) return res.status(401).json({ message: 'User not found' });
 
     req.user = user;
