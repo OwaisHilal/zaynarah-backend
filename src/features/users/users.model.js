@@ -39,16 +39,15 @@ UserSchema.pre('save', async function () {
   }
 });
 
-UserSchema.methods.matchPassword = function (entered) {
-  return bcrypt.compare(entered, this.password);
+UserSchema.methods.matchPassword = function (enteredPassword) {
+  return bcrypt.compare(enteredPassword, this.password);
 };
 
 UserSchema.set('toJSON', {
-  transform: (doc, ret) => {
-    ret.id = ret._id.toString();
-    delete ret._id;
-    delete ret.__v;
+  transform: (_, ret) => {
     delete ret.password;
+    delete ret.emailVerifyToken;
+    delete ret.emailVerifyTokenExpires;
     return ret;
   },
 });

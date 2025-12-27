@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../users/users.model');
 const ApiError = require('../../core/errors/ApiError');
-const { sendVerificationEmail } = require('../../services/mailer.service');
+const mailer = require('../../services/mailer.service');
 
 function signToken(id) {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -26,7 +26,10 @@ exports.register = async ({ name, email, password }) => {
     emailVerifyTokenExpires: Date.now() + 24 * 60 * 60 * 1000,
   });
 
-  await sendVerificationEmail({ to: user.email, token: emailVerifyToken });
+  await mailer.sendVerificationEmail({
+    to: user.email,
+    token: emailVerifyToken,
+  });
 
   const token = signToken(user.id);
   return { user, token };
@@ -39,6 +42,10 @@ exports.login = async ({ email, password }) => {
   const match = await user.matchPassword(password);
   if (!match) throw new ApiError(400, 'Invalid credentials');
 
+  if (!user.emailVerified) {
+    throw new ApiError(403, 'Please verify your email first');
+  }
+
   const token = signToken(user.id);
   return { user, token };
 };
@@ -49,13 +56,13 @@ exports.verifyEmail = async (token) => {
     emailVerifyTokenExpires: { $gt: Date.now() },
   });
 
-  if (!user) throw new ApiError(400, 'Invalid or expired verification link');
+  if (!user) throw new ApiError(400, 'Invalid or expired verification token');
 
   user.emailVerified = true;
   user.emailVerifyToken = undefined;
   user.emailVerifyTokenExpires = undefined;
-  await user.save();
 
+  await user.save();
   return true;
 };
 
@@ -66,9 +73,10 @@ exports.resendVerification = async (userId) => {
 
   user.emailVerifyToken = crypto.randomBytes(32).toString('hex');
   user.emailVerifyTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
+
   await user.save();
 
-  await sendVerificationEmail({
+  await mailer.sendVerificationEmail({
     to: user.email,
     token: user.emailVerifyToken,
   });
