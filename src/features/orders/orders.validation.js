@@ -6,10 +6,6 @@ const objectIdString = z
   .length(24, 'Invalid id')
   .regex(/^[0-9a-fA-F]{24}$/, 'Invalid id');
 
-/* ======================
-   ADDRESS
-====================== */
-
 const addressSchema = z.object({
   fullName: z.string().min(1),
   phone: z.string().min(5),
@@ -22,11 +18,6 @@ const addressSchema = z.object({
   country: z.string().min(1),
 });
 
-/* ======================
-   SHIPPING METHOD
-   (Normalized – backend authority)
-====================== */
-
 const shippingMethodSchema = z.object({
   _id: z.string().min(1),
   label: z.string().min(1),
@@ -36,9 +27,13 @@ const shippingMethodSchema = z.object({
   metadata: z.record(z.any()).optional(),
 });
 
-/* ======================
-   SESSION CHECKOUT
-====================== */
+const fulfillmentSchema = z.object({
+  carrier: z.string().min(1).optional(),
+  trackingId: z.string().min(1).optional(),
+  trackingUrl: z.string().url().optional(),
+  shippedAt: z.coerce.date().optional(),
+  deliveredAt: z.coerce.date().optional(),
+});
 
 const initSessionSchema = z.object({});
 
@@ -56,10 +51,6 @@ const createDraftSchema = z.object({
   paymentGateway: z.enum(['stripe', 'razorpay']),
 });
 
-/* ======================
-   PAYMENT
-====================== */
-
 const confirmPaymentSchema = z.object({
   orderId: objectIdString,
   paymentIntentId: z.string().min(1),
@@ -71,28 +62,33 @@ const paymentFailedSchema = z.object({
   reason: z.string().min(1),
 });
 
-/* ======================
-   PARAMS / ADMIN
-====================== */
-
 const idParamSchema = z.object({
   id: objectIdString,
 });
 
 const updateStatusSchema = z.object({
-  status: z.enum(['draft', 'pending', 'paid', 'failed', 'cancelled']),
+  status: z.enum([
+    'draft',
+    'pending',
+    'paid',
+    'shipped',
+    'delivered',
+    'failed',
+    'cancelled',
+  ]),
+});
+
+const updateFulfillmentSchema = z.object({
+  fulfillment: fulfillmentSchema,
 });
 
 module.exports = {
   initSessionSchema,
   finalizePricingSchema,
   createDraftSchema,
-
-  // payments
   confirmPaymentSchema,
   paymentFailedSchema,
-
-  // admin / access
   idParamSchema,
   updateStatusSchema,
+  updateFulfillmentSchema,
 };

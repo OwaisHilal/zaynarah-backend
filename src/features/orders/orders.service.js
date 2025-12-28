@@ -1,4 +1,3 @@
-// backend/src/features/orders/orders.service.js
 const Order = require('./orders.model');
 const Product = require('../products/products.model');
 const Cart = require('../cart/cart.model');
@@ -32,7 +31,6 @@ module.exports = {
     });
 
     const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
-
     const checkoutSessionId = `cs_${nanoid(10)}`;
 
     const order = await Order.create({
@@ -72,7 +70,6 @@ module.exports = {
     if (!order) throw new ApiError(404, 'Checkout session not found');
 
     const subtotal = order.items.reduce((s, i) => s + i.price * i.qty, 0);
-
     const shippingCost =
       shippingMethod && typeof shippingMethod === 'object'
         ? Number(shippingMethod.cost || 0)
@@ -137,15 +134,86 @@ module.exports = {
     return Order.find({ user: userId }).sort({ createdAt: -1 }).lean();
   },
 
-  updateStatus: async (orderId, status) => {
-    const order = await Order.findByIdAndUpdate(
-      orderId,
-      { status },
-      { new: true }
-    ).lean();
-
+  updateStatus: async (orderId, status, actor, note) => {
+    const order = await Order.findById(orderId);
     if (!order) throw new ApiError(404, 'Order not found');
-    return order;
+
+    const fromStatus = order.status;
+    order.status = status;
+
+    if (actor) {
+      order.statusHistory.push({
+        from: fromStatus,
+        to: status,
+        at: new Date(),
+        actor: {
+          id: actor._id,
+          role: actor.role,
+        },
+        note,
+      });
+    }
+
+    await order.save();
+    return order.toObject();
+  },
+
+  updateFulfillment: async (orderId, fulfillment, actor) => {
+    const order = await Order.findById(orderId);
+    if (!order) throw new ApiError(404, 'Order not found');
+
+    order.fulfillment = {
+      ...(order.fulfillment || {}),
+      ...fulfillment,
+    };
+
+    if (
+      order.status === 'paid' &&
+      fulfillment.trackingId &&
+      order.status !== 'shipped'
+    ) {
+      const fromStatus = order.status;
+      order.status = 'shipped';
+      order.fulfillment.shippedAt = fulfillment.shippedAt || new Date();
+
+      if (actor) {
+        order.statusHistory.push({
+          from: fromStatus,
+          to: 'shipped',
+          at: new Date(),
+          actor: {
+            id: actor._id,
+            role: actor.role,
+          },
+          note: 'Order shipped',
+        });
+      }
+    }
+
+    if (
+      order.status === 'shipped' &&
+      fulfillment.deliveredAt &&
+      order.status !== 'delivered'
+    ) {
+      const fromStatus = order.status;
+      order.status = 'delivered';
+
+      if (actor) {
+        order.statusHistory.push({
+          from: fromStatus,
+          to: 'delivered',
+          at: new Date(),
+          actor: {
+            id: actor._id,
+            role: actor.role,
+          },
+          note: 'Order delivered',
+        });
+      }
+    }
+
+    await order.save();
+    return order.toObject();
   },
 
   markPaid: async (orderId, { paymentIntentId, gateway }) => {
@@ -165,8 +233,8 @@ module.exports = {
     order.paymentStatus = 'paid';
     order.status = 'paid';
     order.paidAt = new Date();
-    await order.save();
 
+    await order.save();
     await Cart.findOneAndUpdate({ user: order.user }, { items: [] });
 
     return order.toObject();

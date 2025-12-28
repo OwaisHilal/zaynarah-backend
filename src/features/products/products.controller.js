@@ -24,6 +24,17 @@ exports.list = async (req, res, next) => {
   }
 };
 
+exports.listAdmin = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 50 } = req.query;
+    const result = await productService.listAdminProducts({ page, limit });
+    result.data = result.data.map(normalizeProduct);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.get = async (req, res, next) => {
   try {
     const { id } = req.validatedParams;

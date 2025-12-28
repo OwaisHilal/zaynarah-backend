@@ -1,9 +1,5 @@
-// src/features/orders/orders.controller.js
+// backend/src/features/orders/orders.controller.js
 const ordersService = require('./orders.service');
-
-/* =====================================================
-   🚫 LEGACY ORDER CREATION (DISABLED)
-===================================================== */
 
 async function legacyCreateDisabled(req, res) {
   return res.status(410).json({
@@ -13,15 +9,7 @@ async function legacyCreateDisabled(req, res) {
 }
 
 module.exports = {
-  /* =====================================================
-     ❌ LEGACY (INTENTIONALLY DISABLED)
-  ===================================================== */
-
   create: legacyCreateDisabled,
-
-  /* =====================================================
-     🔐 ORDER ACCESS
-  ===================================================== */
 
   get: async (req, res, next) => {
     try {
@@ -50,10 +38,6 @@ module.exports = {
     }
   },
 
-  /* =====================================================
-     🧾 ADMIN
-  ===================================================== */
-
   listAdmin: async (req, res, next) => {
     try {
       if (req.user.role !== 'admin')
@@ -81,9 +65,20 @@ module.exports = {
     }
   },
 
-  /* =====================================================
-     🧠 CHECKOUT SESSION LIFECYCLE
-  ===================================================== */
+  updateFulfillment: async (req, res, next) => {
+    try {
+      if (req.user.role !== 'admin')
+        return res.status(403).json({ message: 'Admin required' });
+
+      const id = req.validatedParams?.id || req.params.id;
+      const { fulfillment } = req.validatedBody;
+
+      const order = await ordersService.updateFulfillment(id, fulfillment);
+      res.json(order);
+    } catch (err) {
+      next(err);
+    }
+  },
 
   initSession: async (req, res, next) => {
     try {
@@ -120,10 +115,6 @@ module.exports = {
       next(err);
     }
   },
-
-  /* =====================================================
-     🔒 PAYMENT CONFIRMATION (SERVER-ONLY)
-  ===================================================== */
 
   confirmPayment: async (req, res) => {
     return res.status(403).json({

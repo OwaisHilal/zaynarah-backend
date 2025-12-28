@@ -1,4 +1,4 @@
-// src/features/orders/orders.model.js
+// backend/src/features/orders/orders.model.js
 const mongoose = require('mongoose');
 
 const addressSchema = new mongoose.Schema(
@@ -55,6 +55,31 @@ const cartTotalSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const statusHistorySchema = new mongoose.Schema(
+  {
+    from: String,
+    to: String,
+    at: { type: Date, default: Date.now },
+    actor: {
+      id: mongoose.Schema.Types.ObjectId,
+      role: String,
+    },
+    note: String,
+  },
+  { _id: false }
+);
+
+const fulfillmentSchema = new mongoose.Schema(
+  {
+    carrier: String,
+    trackingId: String,
+    trackingUrl: String,
+    shippedAt: Date,
+    deliveredAt: Date,
+  },
+  { _id: false }
+);
+
 const orderSchema = new mongoose.Schema(
   {
     user: {
@@ -74,7 +99,6 @@ const orderSchema = new mongoose.Schema(
     items: {
       type: [itemSchema],
       required: true,
-      validate: [(v) => v.length > 0, 'Order must contain items'],
     },
 
     cartTotal: { type: cartTotalSchema, required: true },
@@ -83,6 +107,11 @@ const orderSchema = new mongoose.Schema(
     billingAddress: addressSchema,
 
     shippingMethod: shippingMethodSchema,
+
+    fulfillment: {
+      type: fulfillmentSchema,
+      default: {},
+    },
 
     paymentMethod: {
       type: String,
@@ -111,9 +140,22 @@ const orderSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ['draft', 'pending', 'paid', 'failed', 'cancelled'],
+      enum: [
+        'draft',
+        'pending',
+        'paid',
+        'shipped',
+        'delivered',
+        'failed',
+        'cancelled',
+      ],
       default: 'pending',
       index: true,
+    },
+
+    statusHistory: {
+      type: [statusHistorySchema],
+      default: [],
     },
 
     metadata: { type: Object, default: {} },

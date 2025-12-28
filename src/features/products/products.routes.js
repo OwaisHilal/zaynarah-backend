@@ -17,6 +17,8 @@ router.get('/', validate({ query: listProductsQuery }), ctrl.list);
 router.get('/:id', validate({ params: idParamSchema }), ctrl.get);
 
 // --- Admin routes ---
+router.get('/admin', requireLogin, requireAdmin, ctrl.listAdmin);
+
 router.post(
   '/',
   requireLogin,
@@ -24,6 +26,7 @@ router.post(
   validate(createProductSchema),
   ctrl.create
 );
+
 router.put(
   '/:id',
   requireLogin,
@@ -31,6 +34,7 @@ router.put(
   validate({ body: updateProductSchema, params: idParamSchema }),
   ctrl.update
 );
+
 router.delete(
   '/:id',
   requireLogin,

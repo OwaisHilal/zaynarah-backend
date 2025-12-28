@@ -1,4 +1,4 @@
-// src/features/orders/orders.routes.js
+// backend/src/features/orders/orders.routes.js
 const express = require('express');
 const router = express.Router();
 const ctrl = require('./orders.controller');
@@ -6,6 +6,7 @@ const { requireLogin, requireAdmin } = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
 const {
   updateStatusSchema,
+  updateFulfillmentSchema,
   idParamSchema,
   initSessionSchema,
   finalizePricingSchema,
@@ -14,15 +15,7 @@ const {
   paymentFailedSchema,
 } = require('./orders.validation');
 
-/* ======================
-   USER ROUTES
-====================== */
-
 router.get('/my-orders', requireLogin, ctrl.myOrders);
-
-/* ======================
-   CHECKOUT LIFECYCLE
-====================== */
 
 router.post(
   '/checkout/session/init',
@@ -45,10 +38,6 @@ router.post(
   ctrl.createDraft
 );
 
-/* ======================
-   DEPRECATED ROUTES
-====================== */
-
 router.post('/create', requireLogin, (_req, res) => {
   return res.status(410).json({
     message:
@@ -56,15 +45,7 @@ router.post('/create', requireLogin, (_req, res) => {
   });
 });
 
-/* ======================
-   ORDER ACCESS
-====================== */
-
 router.get('/:id', requireLogin, validate({ params: idParamSchema }), ctrl.get);
-
-/* ======================
-   ADMIN
-====================== */
 
 router.get('/', requireLogin, requireAdmin, ctrl.listAdmin);
 
@@ -76,9 +57,13 @@ router.put(
   ctrl.updateStatus
 );
 
-/* ======================
-   PAYMENT CALLBACKS
-====================== */
+router.put(
+  '/:id/fulfillment',
+  requireLogin,
+  requireAdmin,
+  validate({ body: updateFulfillmentSchema, params: idParamSchema }),
+  ctrl.updateFulfillment
+);
 
 router.post(
   '/confirm-payment',
