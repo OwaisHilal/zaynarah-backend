@@ -42,12 +42,15 @@ const startServer = async () => {
   app.use('/api/users', require('./features/users/users.routes'));
   app.use('/api/shipping', require('./features/shipping/shipping.routes'));
   app.use('/api/cart', require('./features/cart/cart.routes'));
+  app.use(
+    '/api/admin/payments',
+    require('./features/admin/payments/adminPayments.routes')
+  );
 
   app.get('/', (req, res) => res.send('Zaynarah API - Feature Based'));
 
   app.use(errorHandler);
 
-  // --- START SERVER ---
   const port = process.env.PORT || 5000;
   app.listen(port, () => logger.info(`Server running on port ${port}`));
 };

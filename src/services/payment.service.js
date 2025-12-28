@@ -114,3 +114,32 @@ exports.verifyRazorpaySignature = (orderId, paymentId, signature) => {
 
   return generated === signature;
 };
+
+exports.refundStripe = async ({ paymentIntentId, amount }) => {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return { id: 'dev_refund', amount };
+  }
+
+  const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+  return stripe.refunds.create({
+    payment_intent: paymentIntentId,
+    amount: Math.round(amount * 100),
+  });
+};
+
+exports.refundRazorpay = async ({ paymentId, amount }) => {
+  if (!process.env.RAZORPAY_KEY_ID) {
+    return { id: 'dev_refund', amount };
+  }
+
+  const Razorpay = require('razorpay');
+  const razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+  });
+
+  return razorpay.payments.refund(paymentId, {
+    amount: Math.round(amount * 100),
+  });
+};

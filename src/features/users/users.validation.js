@@ -2,48 +2,46 @@
 const { z } = require('zod');
 
 const addressSchema = z.object({
-  fullName: z.string().min(1, 'Full name required').max(120),
-  phone: z
-    .string()
-    .min(6, 'Phone required')
-    .max(20, 'Phone too long')
-    .regex(/^[\d+\-\s()]+$/, 'Phone contains invalid characters'),
+  fullName: z.string().min(1).max(120),
+  phone: z.string().min(6).max(20),
   email: z.string().email().optional().or(z.literal('')).optional(),
-  addressLine1: z.string().min(1, 'Address line 1 required').max(500),
+  addressLine1: z.string().min(1).max(500),
   addressLine2: z.string().max(500).optional().or(z.literal('')).optional(),
-  city: z.string().min(1, 'City required').max(100),
-  state: z.string().min(1, 'State required').max(100),
-  postalCode: z.string().min(3, 'Postal code required').max(20),
-  country: z.string().min(2).max(100).optional().default('India'),
-  type: z.enum(['home', 'work', 'other']).optional().default('home'),
-  isDefault: z.boolean().optional().default(false),
+  city: z.string().min(1).max(100),
+  state: z.string().min(1).max(100),
+  postalCode: z.string().min(3).max(20),
+  country: z.string().default('India'),
+  type: z.enum(['home', 'work', 'other']).default('home'),
+  isDefault: z.boolean().default(false),
 });
 
-// Auth / profile schemas
 const registerSchema = z.object({
-  name: z.string().min(2, 'Name is required'),
-  email: z.string().email('Valid email required'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  name: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(6),
 });
 
 const updateProfileSchema = z
   .object({
     name: z.string().min(2).max(50).optional(),
     email: z.string().email().optional(),
-    // optional addresses array for bulk updates
     addresses: z.array(addressSchema).optional(),
   })
-  .refine((obj) => Object.keys(obj).length > 0, {
-    message: 'At least one field is required',
-  });
+  .refine((v) => Object.keys(v).length > 0);
 
 const changePasswordSchema = z.object({
-  oldPassword: z.string().min(1, 'Old password required'),
-  newPassword: z.string().min(6, 'New password must be at least 6 characters'),
+  oldPassword: z.string().min(1),
+  newPassword: z.string().min(6),
 });
 
 const updateRoleSchema = z.object({
   role: z.enum(['customer', 'admin']),
+});
+
+const listUsersQuerySchema = z.object({
+  page: z.preprocess((v) => Number(v ?? 1), z.number().int().min(1)),
+  limit: z.preprocess((v) => Number(v ?? 10), z.number().int().min(1).max(100)),
+  search: z.string().optional(),
 });
 
 module.exports = {
@@ -52,4 +50,5 @@ module.exports = {
   updateProfileSchema,
   changePasswordSchema,
   updateRoleSchema,
+  listUsersQuerySchema,
 };

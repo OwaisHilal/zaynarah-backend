@@ -5,63 +5,68 @@ const { requireLogin, requireAdmin } = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
 
 const {
-  registerSchema,
   updateProfileSchema,
   changePasswordSchema,
   updateRoleSchema,
   addressSchema,
+  listUsersQuerySchema,
 } = require('./users.validation');
 
-// -------------------------
-// AUTH / PROFILE
-// -------------------------
-
 router.get('/me', requireLogin, userCtrl.profile);
+
 router.put(
   '/me',
   requireLogin,
-  validate(updateProfileSchema),
+  validate({ body: updateProfileSchema }),
   userCtrl.updateProfile
 );
+
 router.put(
   '/me/change-password',
   requireLogin,
-  validate(changePasswordSchema),
+  validate({ body: changePasswordSchema }),
   userCtrl.changePassword
 );
 
-// -------------------------
-// ADMIN
-// -------------------------
-router.get('/', requireLogin, requireAdmin, userCtrl.getAllUsers);
+router.get(
+  '/',
+  requireLogin,
+  requireAdmin,
+  validate({ query: listUsersQuerySchema }),
+  userCtrl.getAllUsers
+);
+
 router.put(
   '/:userId/role',
   requireLogin,
   requireAdmin,
-  validate({ body: updateRoleSchema }),
+  validate({
+    params: require('zod').object({ userId: require('zod').string() }),
+    body: updateRoleSchema,
+  }),
   userCtrl.updateUserRole
 );
+
 router.delete('/:userId', requireLogin, requireAdmin, userCtrl.deleteUser);
 
-// -------------------------
-// ADDRESSES
-// -------------------------
 router.get('/addresses', requireLogin, userCtrl.getAddresses);
+
 router.post(
   '/addresses',
   requireLogin,
   validate({ body: addressSchema }),
   userCtrl.addAddress
 );
+
 router.put(
   '/addresses/:addressId',
   requireLogin,
   validate({ body: addressSchema }),
   userCtrl.updateAddress
 );
+
 router.delete('/addresses/:addressId', requireLogin, userCtrl.deleteAddress);
 
-// New route: set address as default
 router.put(
   '/addresses/:addressId/default',
   requireLogin,

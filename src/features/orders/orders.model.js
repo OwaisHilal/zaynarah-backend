@@ -138,6 +138,19 @@ const orderSchema = new mongoose.Schema(
       index: true,
     },
 
+    refunds: {
+      type: [
+        {
+          amount: Number,
+          gateway: String,
+          refundId: String,
+          reason: String,
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
+
     status: {
       type: String,
       enum: [

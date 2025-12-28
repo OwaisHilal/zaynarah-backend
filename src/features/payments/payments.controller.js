@@ -107,6 +107,52 @@ exports.verifyRazorpaySignature = async (req, res) => {
   res.status(501).json({ message: 'Razorpay verification not implemented' });
 };
 
+exports.refundPayment = async (req, res, next) => {
+  try {
+    const { orderId, amount, reason } = req.body;
+
+    if (!orderId || !amount) {
+      return res.status(400).json({ message: 'orderId and amount required' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    if (order.paymentStatus !== 'paid') {
+      return res.status(400).json({ message: 'Order is not paid' });
+    }
+
+    let refund;
+
+    if (order.paymentProvider === 'stripe') {
+      refund = await paymentService.refundStripe({
+        paymentIntentId: order.paymentIntentId,
+        amount,
+      });
+    }
+
+    if (order.paymentProvider === 'razorpay') {
+      refund = await paymentService.refundRazorpay({
+        paymentId: order.paymentIntentId,
+        amount,
+      });
+    }
+
+    order.refunds.push({
+      amount,
+      gateway: order.paymentProvider,
+      refundId: refund.id || 'dev',
+      reason,
+    });
+
+    await order.save();
+
+    res.json({ success: true, refund });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.getPaymentStatus = async (req, res) => {
   res.json({ status: 'pending' });
 };

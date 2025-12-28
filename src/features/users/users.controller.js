@@ -4,9 +4,6 @@ const ApiError = require('../../core/errors/ApiError');
 const jwt = require('jsonwebtoken');
 
 module.exports = {
-  // -------------------------
-  // AUTH / PROFILE
-  // -------------------------
   register: async (req, res, next) => {
     try {
       const body = req.validatedBody;
@@ -55,17 +52,16 @@ module.exports = {
     }
   },
 
-  // -------------------------
-  // ADMIN
-  // -------------------------
   getAllUsers: async (req, res, next) => {
     try {
-      const { page, limit, search } = req.validatedQuery;
+      const { page = 1, limit = 10, search = '' } = req.validatedQuery || {};
+
       const data = await userService.getAllUsers({
         page: Number(page),
         limit: Number(limit),
         search,
       });
+
       res.json(data);
     } catch (err) {
       next(err);
@@ -76,7 +72,7 @@ module.exports = {
     try {
       const { role } = req.validatedBody;
       const updated = await userService.updateRole(
-        req.validatedParams.userId,
+        req.validatedParams?.userId || req.params.userId,
         role
       );
       res.json(updated);
@@ -87,16 +83,13 @@ module.exports = {
 
   deleteUser: async (req, res, next) => {
     try {
-      await userService.deleteUser(req.validatedParams.userId);
+      await userService.deleteUser(req.params.userId);
       res.json({ message: 'User deleted successfully' });
     } catch (err) {
       next(err);
     }
   },
 
-  // -------------------------
-  // ADDRESSES
-  // -------------------------
   getAddresses: async (req, res, next) => {
     try {
       const addresses = await userService.getAddresses(req.user.id);
@@ -112,7 +105,6 @@ module.exports = {
         req.user.id,
         req.validatedBody
       );
-      // return address with id
       res.status(201).json(newAddress);
     } catch (err) {
       next(err);
@@ -141,7 +133,6 @@ module.exports = {
     }
   },
 
-  // New: set an address as default
   setDefaultAddress: async (req, res, next) => {
     try {
       const address = await userService.setDefaultAddress(
