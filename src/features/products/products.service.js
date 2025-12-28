@@ -8,48 +8,61 @@ exports.listProducts = async (filters) => {
     category,
     priceMax,
     sort = 'createdAt:desc',
+    q,
   } = filters;
 
   const query = {};
-  if (category) query.category = category;
-  if (priceMax) query.price = { $lte: priceMax };
 
+  // Category filter
+  if (category) {
+    query.category = category;
+  }
+
+  // Price filter
+  if (priceMax) {
+    query.price = { $lte: priceMax };
+  }
+
+  // 🔍 SEARCH (FIX)
+  if (q) {
+    const regex = new RegExp(q, 'i'); // case-insensitive
+    query.$or = [{ title: regex }, { description: regex }, { category: regex }];
+  }
+
+  // Sorting
   const [field, direction] = sort.split(':');
-  const sortOptions = { [field]: direction === 'asc' ? 1 : -1 };
+  const sortOptions = {
+    [field]: direction === 'asc' ? 1 : -1,
+  };
 
-  const total = await Product.countDocuments(query);
-  const totalPages = Math.ceil(total / limit);
   const skip = (page - 1) * limit;
 
-  const products = await Product.find(query)
-    .sort(sortOptions)
-    .skip(skip)
-    .limit(limit)
-    .lean();
+  const [total, products] = await Promise.all([
+    Product.countDocuments(query),
+    Product.find(query).sort(sortOptions).skip(skip).limit(limit).lean(),
+  ]);
 
   return {
     data: products,
-    page: parseInt(page),
-    limit: parseInt(limit),
+    page: Number(page),
+    limit: Number(limit),
     total,
-    totalPages,
+    totalPages: Math.ceil(total / limit),
   };
 };
 
 exports.listAdminProducts = async ({ page = 1, limit = 50 }) => {
   const skip = (page - 1) * limit;
-  const total = await Product.countDocuments();
 
-  const products = await Product.find()
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit)
-    .lean();
+  const [total, products] = await Promise.all([
+    Product.countDocuments(),
+    Product.find().sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+  ]);
 
   return {
     data: products,
-    page: parseInt(page),
-    limit: parseInt(limit),
+    page: Number(page),
+    limit: Number(limit),
     total,
     totalPages: Math.ceil(total / limit),
   };
