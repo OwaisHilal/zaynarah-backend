@@ -46,6 +46,7 @@ const startServer = async () => {
     '/api/admin/payments',
     require('./features/admin/payments/adminPayments.routes')
   );
+  app.use('/api/admin', require('./features/admin/admin.routes'));
 
   app.get('/', (req, res) => res.send('Zaynarah API - Feature Based'));
 
