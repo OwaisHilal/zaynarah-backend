@@ -3,13 +3,17 @@ const clients = new Map();
 const HEARTBEAT_INTERVAL = 25000;
 
 function addClient(userId, res) {
+  // Set headers for SSE
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache, no-transform',
     Connection: 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
   });
 
+  // Instruction for client to reconnect after 3s if connection drops
   res.write('retry: 3000\n\n');
+  res.write('event: connected\ndata: {"status":"ok"}\n\n');
 
   if (!clients.has(userId)) {
     clients.set(userId, new Set());
@@ -18,8 +22,9 @@ function addClient(userId, res) {
   clients.get(userId).add(res);
 
   const heartbeat = setInterval(() => {
-    if (res.writableEnded) return;
-    res.write(': ping\n\n');
+    if (!res.writableEnded) {
+      res.write(': heartbeat\n\n');
+    }
   }, HEARTBEAT_INTERVAL);
 
   res.on('close', () => {

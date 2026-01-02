@@ -1,8 +1,11 @@
 // backend/src/features/notifications/notifications.controller.js
 const notificationsService = require('./notifications.service');
+const ApiError = require('../../core/errors/ApiError');
 
 exports.listMyNotifications = async (req, res, next) => {
   try {
+    if (!req.user?._id) throw new ApiError(401, 'User not authenticated');
+
     const notifications = await notificationsService.listForUser(
       req.user._id,
       req.query
@@ -15,6 +18,8 @@ exports.listMyNotifications = async (req, res, next) => {
 
 exports.getUnreadCount = async (req, res, next) => {
   try {
+    if (!req.user?._id) throw new ApiError(401, 'User not authenticated');
+
     const count = await notificationsService.unreadCount(req.user._id);
     res.json({ count });
   } catch (err) {
@@ -24,6 +29,8 @@ exports.getUnreadCount = async (req, res, next) => {
 
 exports.markAsRead = async (req, res, next) => {
   try {
+    if (!req.user?._id) throw new ApiError(401, 'User not authenticated');
+
     await notificationsService.markAsRead(req.user._id, req.params.id);
     res.status(204).end();
   } catch (err) {
@@ -33,6 +40,8 @@ exports.markAsRead = async (req, res, next) => {
 
 exports.markAllAsRead = async (req, res, next) => {
   try {
+    if (!req.user?._id) throw new ApiError(401, 'User not authenticated');
+
     await notificationsService.markAllAsRead(req.user._id);
     res.status(204).end();
   } catch (err) {

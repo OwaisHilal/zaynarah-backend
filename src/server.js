@@ -1,4 +1,4 @@
-// src/server.js
+// backend/src/server.js
 require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
@@ -20,7 +20,7 @@ const startServer = async () => {
   app.use(helmet());
   app.use(
     cors({
-      origin: '*',
+      origin: process.env.CLIENT_URL || '*',
       credentials: true,
     })
   );
@@ -48,11 +48,20 @@ const startServer = async () => {
   );
   app.use('/api/admin', require('./features/admin/admin.routes'));
 
-  app.get('/', (req, res) => res.send('Zaynarah API - Feature Based'));
+  // FIX: Mount both notification files to the same base path
+  // REST endpoints like /api/notifications/unread-count
+  app.use(
+    '/api/notifications',
+    require('./features/notifications/notifications.routes')
+  );
+
+  // SSE endpoint will become /api/notifications/stream
   app.use(
     '/api/notifications',
     require('./features/notifications/notifications.sse.routes')
   );
+
+  app.get('/', (req, res) => res.send('Zaynarah API - Feature Based'));
 
   app.use(errorHandler);
 
