@@ -3,23 +3,14 @@ const clients = new Map();
 const HEARTBEAT_INTERVAL = 25000;
 
 function addClient(userId, res) {
-  // Set headers for SSE
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache, no-transform',
-    Connection: 'keep-alive',
-    'Access-Control-Allow-Origin': '*',
-  });
-
-  // Instruction for client to reconnect after 3s if connection drops
-  res.write('retry: 3000\n\n');
-  res.write('event: connected\ndata: {"status":"ok"}\n\n');
-
   if (!clients.has(userId)) {
     clients.set(userId, new Set());
   }
 
   clients.get(userId).add(res);
+
+  res.write('retry: 3000\n\n');
+  res.write('event: connected\ndata: {"status":"ok"}\n\n');
 
   const heartbeat = setInterval(() => {
     if (!res.writableEnded) {
@@ -44,15 +35,17 @@ function removeClient(userId, res) {
   }
 }
 
-function sendToUser(userId, payload) {
+function sendToUser(userId, event) {
   const set = clients.get(userId);
   if (!set) return;
 
-  const data = `data: ${JSON.stringify(payload)}\n\n`;
+  const payload = `event: ${event.type}\ndata: ${JSON.stringify(
+    event.payload
+  )}\n\n`;
 
   for (const res of set) {
     if (!res.writableEnded) {
-      res.write(data);
+      res.write(payload);
     }
   }
 }

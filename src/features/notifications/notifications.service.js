@@ -1,9 +1,23 @@
+// backend/src/features/notifications/notifications.service.js
 const Notification = require('./notifications.model');
 const { notificationsQueue } = require('../../services/queue.service');
 
+function buildJobId(payload) {
+  const parts = [
+    payload.userId,
+    payload.type,
+    payload.entityType,
+    payload.entityId || 'none',
+  ];
+  return parts.join(':');
+}
+
 module.exports = {
   enqueue: async (payload) => {
+    const jobId = buildJobId(payload);
+
     await notificationsQueue.add('create-notification', payload, {
+      jobId,
       removeOnComplete: true,
       removeOnFail: 100,
     });
