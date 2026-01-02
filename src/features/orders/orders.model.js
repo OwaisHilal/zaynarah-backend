@@ -1,4 +1,3 @@
-// backend/src/features/orders/orders.model.js
 const mongoose = require('mongoose');
 
 const addressSchema = new mongoose.Schema(
@@ -101,7 +100,10 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
 
-    cartTotal: { type: cartTotalSchema, required: true },
+    cartTotal: {
+      type: cartTotalSchema,
+      required: true,
+    },
 
     shippingAddress: addressSchema,
     billingAddress: addressSchema,
@@ -119,7 +121,10 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
 
-    paymentDetails: { type: Object, default: {} },
+    paymentDetails: {
+      type: Object,
+      default: {},
+    },
 
     paymentProvider: {
       type: String,
@@ -136,6 +141,14 @@ const orderSchema = new mongoose.Schema(
       enum: ['pending', 'paid', 'failed'],
       default: 'pending',
       index: true,
+    },
+
+    failureReason: {
+      type: String,
+    },
+
+    failedAt: {
+      type: Date,
     },
 
     refunds: {
@@ -171,7 +184,10 @@ const orderSchema = new mongoose.Schema(
       default: [],
     },
 
-    metadata: { type: Object, default: {} },
+    metadata: {
+      type: Object,
+      default: {},
+    },
 
     paidAt: Date,
   },

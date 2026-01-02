@@ -1,10 +1,9 @@
-// backend/src/features/orders/orders.validation.js
 const { z } = require('zod');
 
 const objectIdString = z
   .string()
-  .length(24, 'Invalid id')
-  .regex(/^[0-9a-fA-F]{24}$/, 'Invalid id');
+  .length(24)
+  .regex(/^[0-9a-fA-F]{24}$/);
 
 const addressSchema = z.object({
   fullName: z.string().min(1),
@@ -42,8 +41,6 @@ const finalizePricingSchema = z.object({
   shippingAddress: addressSchema,
   billingAddress: addressSchema.optional(),
   shippingMethod: shippingMethodSchema,
-  weight: z.number().min(0).optional().default(0),
-  itemsCount: z.number().int().min(0).optional().default(0),
 });
 
 const createDraftSchema = z.object({
@@ -59,7 +56,7 @@ const confirmPaymentSchema = z.object({
 
 const paymentFailedSchema = z.object({
   orderId: objectIdString,
-  reason: z.string().min(1),
+  reason: z.string().min(1).optional(),
 });
 
 const idParamSchema = z.object({
@@ -76,6 +73,7 @@ const updateStatusSchema = z.object({
     'failed',
     'cancelled',
   ]),
+  note: z.string().optional(),
 });
 
 const updateFulfillmentSchema = z.object({

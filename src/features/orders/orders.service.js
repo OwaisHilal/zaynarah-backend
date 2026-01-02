@@ -1,4 +1,3 @@
-//src/features/orders/orders.service.js
 const Order = require('./orders.model');
 const Product = require('../products/products.model');
 const Cart = require('../cart/cart.model');
@@ -12,9 +11,13 @@ const {
 } = require('../notifications/notifications.types');
 
 module.exports = {
+  /* =========================
+     CHECKOUT SESSION
+  ========================= */
+
   initSessionFromCart: async (userId) => {
     const cart = await Cart.findOne({ user: userId }).populate('items.product');
-    if (!cart || !cart.items || !cart.items.length) {
+    if (!cart || !cart.items?.length) {
       throw new ApiError(400, 'Cart is empty');
     }
 
@@ -120,6 +123,10 @@ module.exports = {
     return order.toObject();
   },
 
+  /* =========================
+     READ OPERATIONS
+  ========================= */
+
   getOrderById: async (orderId) => {
     const order = await Order.findById(orderId).lean();
     if (!order) throw new ApiError(404, 'Order not found');
@@ -141,13 +148,17 @@ module.exports = {
     return Order.find({ user: userId }).sort({ createdAt: -1 }).lean();
   },
 
+  /* =========================
+     STATUS UPDATES
+  ========================= */
+
   updateStatus: async (orderId, status, actor, note) => {
     const order = await Order.findById(orderId);
     if (!order) throw new ApiError(404, 'Order not found');
 
-    const fromStatus = order.status;
-    if (fromStatus === status) return order.toObject();
+    if (order.status === status) return order.toObject();
 
+    const fromStatus = order.status;
     order.status = status;
 
     if (actor) {
@@ -181,7 +192,7 @@ module.exports = {
     return order.toObject();
   },
 
-  updateFulfillment: async (orderId, fulfillment, actor) => {
+  updateFulfillment: async (orderId, fulfillment) => {
     const order = await Order.findById(orderId);
     if (!order) throw new ApiError(404, 'Order not found');
 
@@ -190,11 +201,7 @@ module.exports = {
       ...fulfillment,
     };
 
-    if (
-      order.status === 'paid' &&
-      fulfillment.trackingId &&
-      order.status !== 'shipped'
-    ) {
+    if (order.status === 'paid' && fulfillment.trackingId) {
       order.status = 'shipped';
       order.fulfillment.shippedAt = fulfillment.shippedAt || new Date();
 
@@ -210,11 +217,7 @@ module.exports = {
       });
     }
 
-    if (
-      order.status === 'shipped' &&
-      fulfillment.deliveredAt &&
-      order.status !== 'delivered'
-    ) {
+    if (order.status === 'shipped' && fulfillment.deliveredAt) {
       order.status = 'delivered';
 
       await notificationsService.enqueue({
@@ -233,9 +236,17 @@ module.exports = {
     return order.toObject();
   },
 
+  /* =========================
+     PAYMENTS
+  ========================= */
+
   markPaid: async (orderId, { paymentIntentId, gateway }) => {
     const order = await Order.findById(orderId);
     if (!order) throw new ApiError(404, 'Order not found');
+
+    if (order.paymentStatus === 'paid') {
+      return order.toObject(); // idempotent
+    }
 
     for (const item of order.items) {
       const product = await Product.findById(item.productId);
@@ -262,6 +273,41 @@ module.exports = {
       title: 'Payment successful',
       message: 'We have received your payment.',
       actionUrl: `/orders/${order._id}`,
+      priority: 'high',
+    });
+
+    return order.toObject();
+  },
+
+  markFailed: async (orderId, reason = 'payment_failed') => {
+    const order = await Order.findById(orderId);
+    if (!order) throw new ApiError(404, 'Order not found');
+
+    // Never override a successful payment
+    if (order.paymentStatus === 'paid') {
+      return order.toObject();
+    }
+
+    // Idempotency: do nothing if already failed
+    if (order.paymentStatus === 'failed') {
+      return order.toObject();
+    }
+
+    order.paymentStatus = 'failed';
+    order.status = 'pending';
+    order.failureReason = reason;
+    order.failedAt = new Date();
+
+    await order.save();
+
+    await notificationsService.enqueue({
+      userId: order.user,
+      type: NOTIFICATION_TYPES.PAYMENT_FAILED,
+      entityType: ENTITY_TYPES.PAYMENT,
+      entityId: order._id,
+      title: 'Payment failed',
+      message: 'Your payment could not be completed. Please try again.',
+      actionUrl: `/checkout?order=${order._id}`,
       priority: 'high',
     });
 

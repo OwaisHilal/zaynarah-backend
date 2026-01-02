@@ -1,4 +1,3 @@
-// backend/src/features/orders/orders.routes.js
 const express = require('express');
 const router = express.Router();
 const ctrl = require('./orders.controller');

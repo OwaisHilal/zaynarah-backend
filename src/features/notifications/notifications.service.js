@@ -1,4 +1,3 @@
-///backend/src/features/notifications/notifications.service.js
 const Notification = require('./notifications.model');
 const { notificationsQueue } = require('../../services/queue.service');
 
@@ -37,13 +36,11 @@ module.exports = {
   listForUser: async (userId, { page = 1, limit = 20 } = {}) => {
     const skip = (page - 1) * limit;
 
-    const items = await Notification.find({ user: userId })
+    return Notification.find({ user: userId })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
-
-    return items;
   },
 
   unreadCount: async (userId) => {

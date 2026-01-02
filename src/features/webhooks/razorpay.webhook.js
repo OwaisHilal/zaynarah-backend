@@ -1,7 +1,6 @@
-// src/features/webhooks/razorpay.webhook.js
 const crypto = require('crypto');
-const Order = require('../orders/orders.model');
 const logger = require('../../lib/logger');
+const ordersService = require('../orders/orders.service');
 
 module.exports = async function razorpayWebhook(req, res) {
   const signature = req.headers['x-razorpay-signature'];
@@ -14,55 +13,66 @@ module.exports = async function razorpayWebhook(req, res) {
   try {
     const rawBody = (req.rawBody || req.body).toString('utf8');
 
-    const expected = crypto
+    const expectedSignature = crypto
       .createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET)
       .update(rawBody)
       .digest('hex');
 
-    if (expected !== signature) {
-      logger.warn('Razorpay webhook: Signature mismatch', {
-        expected,
-        provided: signature,
-      });
+    if (expectedSignature !== signature) {
+      logger.warn('Razorpay webhook: Signature mismatch');
       return res.status(400).send('Invalid signature');
     }
 
-    const data = JSON.parse(rawBody);
-    const evt = data.event;
+    const payload = JSON.parse(rawBody);
+    const event = payload.event;
 
-    const paymentEntity =
-      data.payload?.payment?.entity || data.payload?.payment || {};
-
-    const orderId =
-      paymentEntity?.notes?.orderId || paymentEntity?.receipt || null;
-
-    if (!evt) {
+    if (!event) {
       logger.warn('Razorpay webhook: Missing event type');
       return res.json({ ok: true });
     }
 
-    if ((evt === 'payment.captured' || evt === 'order.paid') && orderId) {
-      const order = await Order.findById(orderId);
+    const paymentEntity =
+      payload.payload?.payment?.entity || payload.payload?.payment || {};
 
-      if (!order) {
-        logger.warn(`Razorpay webhook: Order not found (${orderId})`);
-      } else if (order.status === 'paid') {
-        logger.info(`Razorpay webhook: Already paid (${orderId})`);
-      } else {
-        order.status = 'paid';
-        order.paymentProvider = 'razorpay';
-        order.paymentIntentId = paymentEntity?.id;
+    const orderId =
+      paymentEntity?.notes?.orderId ||
+      paymentEntity?.receipt ||
+      paymentEntity?.order_id ||
+      null;
 
-        await order.save();
-        logger.info(`Razorpay webhook: Order marked PAID (${orderId})`);
-      }
+    if (!orderId) {
+      logger.warn('Razorpay webhook: Missing orderId', { event });
+      return res.json({ ok: true });
+    }
+
+    if (event === 'payment.captured' || event === 'order.paid') {
+      await ordersService.markPaid(orderId, {
+        paymentIntentId: paymentEntity?.id,
+        gateway: 'razorpay',
+      });
+
+      logger.info(`Razorpay webhook: Payment captured for order ${orderId}`);
+    } else if (event === 'payment.failed' || event === 'order.payment_failed') {
+      const failureReason =
+        paymentEntity?.error_reason ||
+        paymentEntity?.error_description ||
+        'payment_failed';
+
+      await ordersService.markFailed(orderId, failureReason);
+
+      logger.warn(`Razorpay webhook: Payment failed for order ${orderId}`, {
+        reason: failureReason,
+      });
     } else {
-      logger.debug(`Razorpay webhook: Unhandled event ${evt}`);
+      logger.debug(`Razorpay webhook: Ignored event ${event}`);
     }
 
     return res.json({ ok: true });
   } catch (err) {
-    logger.error('Razorpay webhook internal error:', err);
+    logger.error('Razorpay webhook internal error', {
+      message: err.message,
+      stack: err.stack,
+    });
     return res.status(500).send('Internal webhook error');
   }
 };

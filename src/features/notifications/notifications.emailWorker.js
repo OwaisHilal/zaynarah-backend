@@ -1,4 +1,4 @@
-//backend/src/features/notifications/notifications.emailWorker.js
+// backend/src/features/notifications/notifications.emailWorker.js
 const { Worker, connection, logger } = require('../../services/queue.service');
 const User = require('../users/users.model');
 const emailRules = require('./notifications.emailRules');
@@ -8,14 +8,21 @@ new Worker(
   'emails',
   async (job) => {
     const notification = job.data;
-    const rule = emailRules[notification.type];
 
-    if (!rule || !rule.sendEmail) return;
+    const rule = emailRules[notification.type] || emailRules.__default;
+
+    if (!rule.sendEmail) return;
 
     const user = await User.findById(notification.user).lean();
     if (!user || !user.email) return;
 
-    if (!rule.roles.includes(user.role)) return;
+    if (
+      Array.isArray(rule.roles) &&
+      rule.roles.length > 0 &&
+      !rule.roles.includes(user.role)
+    ) {
+      return;
+    }
 
     await sendNotificationEmail({
       to: user.email,

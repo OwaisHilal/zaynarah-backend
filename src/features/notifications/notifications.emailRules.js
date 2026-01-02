@@ -1,5 +1,4 @@
-//backend/src/features/notifications/notifications.emailRules.js
-
+// backend/src/features/notifications/notifications.emailRules.js
 const { NOTIFICATION_TYPES, PRIORITY } = require('./notifications.types');
 
 module.exports = {
@@ -31,5 +30,11 @@ module.exports = {
     sendEmail: true,
     priority: PRIORITY.NORMAL,
     roles: ['admin'],
+  },
+
+  __default: {
+    sendEmail: false,
+    priority: PRIORITY.NORMAL,
+    roles: [],
   },
 };
