@@ -1,8 +1,15 @@
+//src/features/orders/orders.service.js
 const Order = require('./orders.model');
 const Product = require('../products/products.model');
 const Cart = require('../cart/cart.model');
 const ApiError = require('../../core/errors/ApiError');
 const { nanoid } = require('nanoid');
+
+const notificationsService = require('../notifications/notifications.service');
+const {
+  ENTITY_TYPES,
+  NOTIFICATION_TYPES,
+} = require('../notifications/notifications.types');
 
 module.exports = {
   initSessionFromCart: async (userId) => {
@@ -139,6 +146,8 @@ module.exports = {
     if (!order) throw new ApiError(404, 'Order not found');
 
     const fromStatus = order.status;
+    if (fromStatus === status) return order.toObject();
+
     order.status = status;
 
     if (actor) {
@@ -155,6 +164,20 @@ module.exports = {
     }
 
     await order.save();
+
+    if (status === 'cancelled') {
+      await notificationsService.enqueue({
+        userId: order.user,
+        type: NOTIFICATION_TYPES.ORDER_CANCELLED,
+        entityType: ENTITY_TYPES.ORDER,
+        entityId: order._id,
+        title: 'Order cancelled',
+        message: 'Your order has been cancelled.',
+        actionUrl: `/orders/${order._id}`,
+        priority: 'high',
+      });
+    }
+
     return order.toObject();
   },
 
@@ -172,22 +195,19 @@ module.exports = {
       fulfillment.trackingId &&
       order.status !== 'shipped'
     ) {
-      const fromStatus = order.status;
       order.status = 'shipped';
       order.fulfillment.shippedAt = fulfillment.shippedAt || new Date();
 
-      if (actor) {
-        order.statusHistory.push({
-          from: fromStatus,
-          to: 'shipped',
-          at: new Date(),
-          actor: {
-            id: actor._id,
-            role: actor.role,
-          },
-          note: 'Order shipped',
-        });
-      }
+      await notificationsService.enqueue({
+        userId: order.user,
+        type: NOTIFICATION_TYPES.ORDER_SHIPPED,
+        entityType: ENTITY_TYPES.ORDER,
+        entityId: order._id,
+        title: 'Order shipped',
+        message: 'Your order is on its way.',
+        actionUrl: `/orders/${order._id}`,
+        priority: 'normal',
+      });
     }
 
     if (
@@ -195,21 +215,18 @@ module.exports = {
       fulfillment.deliveredAt &&
       order.status !== 'delivered'
     ) {
-      const fromStatus = order.status;
       order.status = 'delivered';
 
-      if (actor) {
-        order.statusHistory.push({
-          from: fromStatus,
-          to: 'delivered',
-          at: new Date(),
-          actor: {
-            id: actor._id,
-            role: actor.role,
-          },
-          note: 'Order delivered',
-        });
-      }
+      await notificationsService.enqueue({
+        userId: order.user,
+        type: NOTIFICATION_TYPES.ORDER_DELIVERED,
+        entityType: ENTITY_TYPES.ORDER,
+        entityId: order._id,
+        title: 'Order delivered',
+        message: 'Your order has been delivered.',
+        actionUrl: `/orders/${order._id}`,
+        priority: 'normal',
+      });
     }
 
     await order.save();
@@ -236,6 +253,17 @@ module.exports = {
 
     await order.save();
     await Cart.findOneAndUpdate({ user: order.user }, { items: [] });
+
+    await notificationsService.enqueue({
+      userId: order.user,
+      type: NOTIFICATION_TYPES.ORDER_PAID,
+      entityType: ENTITY_TYPES.ORDER,
+      entityId: order._id,
+      title: 'Payment successful',
+      message: 'We have received your payment.',
+      actionUrl: `/orders/${order._id}`,
+      priority: 'high',
+    });
 
     return order.toObject();
   },

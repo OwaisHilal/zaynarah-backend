@@ -28,8 +28,38 @@ exports.sendVerificationEmail = async ({ to, token }) => {
            text-decoration:none;font-weight:bold">
            Verify Email
         </a>
-        <p style="margin-top:16px;font-size:12px;color:#666">
-          This link expires in 24 hours.
+      </div>
+    `,
+  });
+};
+
+exports.sendNotificationEmail = async ({
+  to,
+  subject,
+  title,
+  message,
+  actionUrl,
+}) => {
+  await transporter.sendMail({
+    from: `"Zaynarah" <${process.env.SMTP_USER}>`,
+    to,
+    subject,
+    html: `
+      <div style="font-family:Arial;padding:32px;max-width:560px">
+        <h2 style="margin-bottom:12px">${title}</h2>
+        <p style="color:#444;font-size:15px">${message}</p>
+        ${
+          actionUrl
+            ? `<a href="${process.env.FRONTEND_URL}${actionUrl}"
+                 style="display:inline-block;margin-top:20px;
+                 padding:12px 20px;background:#111;color:#fff;
+                 border-radius:24px;text-decoration:none;font-weight:bold">
+                 View details
+               </a>`
+            : ''
+        }
+        <p style="margin-top:32px;font-size:12px;color:#777">
+          Zaynarah · Crafted Heritage
         </p>
       </div>
     `,

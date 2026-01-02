@@ -49,6 +49,10 @@ const startServer = async () => {
   app.use('/api/admin', require('./features/admin/admin.routes'));
 
   app.get('/', (req, res) => res.send('Zaynarah API - Feature Based'));
+  app.use(
+    '/api/notifications',
+    require('./features/notifications/notifications.sse.routes')
+  );
 
   app.use(errorHandler);
 
