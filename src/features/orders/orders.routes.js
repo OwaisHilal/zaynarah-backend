@@ -1,3 +1,4 @@
+/* backend/src/features/orders/orders.routes.js */
 const express = require('express');
 const router = express.Router();
 const ctrl = require('./orders.controller');
@@ -43,6 +44,13 @@ router.post('/create', requireLogin, (_req, res) => {
       'Order creation via /orders/create is deprecated. Use checkout session flow instead.',
   });
 });
+
+router.get(
+  '/:id/invoice',
+  requireLogin,
+  validate({ params: idParamSchema }),
+  ctrl.invoice
+);
 
 router.get('/:id', requireLogin, validate({ params: idParamSchema }), ctrl.get);
 

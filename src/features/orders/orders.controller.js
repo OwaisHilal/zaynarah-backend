@@ -1,3 +1,4 @@
+/* backend/src/features/orders/orders.controller.js */
 const ordersService = require('./orders.service');
 
 async function legacyCreateDisabled(req, res) {
@@ -23,6 +24,32 @@ module.exports = {
       }
 
       res.json(order);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  invoice: async (req, res, next) => {
+    try {
+      const id = req.validatedParams?.id || req.params.id;
+      const order = await ordersService.getOrderById(id);
+
+      if (
+        req.user.role !== 'admin' &&
+        String(order.user) !== String(req.user._id)
+      ) {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
+
+      const html = await ordersService.generateInvoiceHtml(id);
+
+      res.setHeader('Content-Type', 'text/html');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="invoice-${order._id}.html"`
+      );
+
+      res.send(html);
     } catch (err) {
       next(err);
     }
@@ -130,7 +157,7 @@ module.exports = {
     }
   },
 
-  confirmPayment: async (req, res) => {
+  confirmPayment: async () => {
     return res.status(403).json({
       message:
         'Direct payment confirmation is disabled. Payments are verified server-side.',
