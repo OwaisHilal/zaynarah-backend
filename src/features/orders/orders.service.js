@@ -4,6 +4,7 @@ const Product = require('../products/products.model');
 const Cart = require('../cart/cart.model');
 const ApiError = require('../../core/errors/ApiError');
 const { nanoid } = require('nanoid');
+const puppeteer = require('puppeteer');
 
 const notificationsService = require('../notifications/notifications.service');
 const {
@@ -22,7 +23,6 @@ function buildInvoiceHtml(order) {
   const items = order.items || [];
   const totals = order.cartTotal || {};
   const billing = order.billingAddress || {};
-  const shipping = order.shippingAddress || billing;
 
   return `
 <!DOCTYPE html>
@@ -53,7 +53,6 @@ function buildInvoiceHtml(order) {
     .brand h1 {
       margin: 0;
       font-size: 28px;
-      letter-spacing: -0.5px;
     }
     .brand p {
       margin: 4px 0 0;
@@ -187,7 +186,44 @@ function buildInvoiceHtml(order) {
 `;
 }
 
+async function renderInvoicePdf(order) {
+  const browser = await puppeteer.launch({
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+
+  const page = await browser.newPage();
+  await page.setContent(buildInvoiceHtml(order), {
+    waitUntil: 'networkidle0',
+  });
+
+  const pdf = await page.pdf({
+    format: 'A4',
+    printBackground: true,
+    margin: {
+      top: '20mm',
+      bottom: '20mm',
+      left: '20mm',
+      right: '20mm',
+    },
+  });
+
+  await browser.close();
+  return pdf;
+}
+
 module.exports = {
+  generateInvoiceHtml: async (orderId) => {
+    const order = await Order.findById(orderId).lean();
+    if (!order) throw new ApiError(404, 'Order not found');
+    return buildInvoiceHtml(order);
+  },
+
+  generateInvoicePdf: async (orderId) => {
+    const order = await Order.findById(orderId).lean();
+    if (!order) throw new ApiError(404, 'Order not found');
+    return renderInvoicePdf(order);
+  },
+
   initSessionFromCart: async (userId) => {
     const cart = await Cart.findOne({ user: userId }).populate('items.product');
     if (!cart || !cart.items?.length) {
@@ -315,12 +351,6 @@ module.exports = {
 
   listForUser: async (userId) => {
     return Order.find({ user: userId }).sort({ createdAt: -1 }).lean();
-  },
-
-  generateInvoiceHtml: async (orderId) => {
-    const order = await Order.findById(orderId).lean();
-    if (!order) throw new ApiError(404, 'Order not found');
-    return buildInvoiceHtml(order);
   },
 
   updateStatus: async (orderId, status, actor, note) => {

@@ -55,6 +55,32 @@ module.exports = {
     }
   },
 
+  invoicePdf: async (req, res, next) => {
+    try {
+      const id = req.validatedParams?.id || req.params.id;
+      const order = await ordersService.getOrderById(id);
+
+      if (
+        req.user.role !== 'admin' &&
+        String(order.user) !== String(req.user._id)
+      ) {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
+
+      const pdf = await ordersService.generateInvoicePdf(id);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="invoice-${order._id}.pdf"`
+      );
+
+      res.send(pdf);
+    } catch (err) {
+      next(err);
+    }
+  },
+
   myOrders: async (req, res, next) => {
     try {
       const orders = await ordersService.listForUser(req.user._id);
