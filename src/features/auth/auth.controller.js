@@ -40,3 +40,27 @@ exports.resendVerification = async (req, res, next) => {
     next(err);
   }
 };
+
+/* =========================
+   PASSWORD RESET
+========================= */
+
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    await authService.forgotPassword(email);
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const { token, newPassword } = req.body;
+    await authService.resetPassword({ token, newPassword });
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+};

@@ -33,6 +33,52 @@ exports.sendVerificationEmail = async ({ to, token }) => {
   });
 };
 
+exports.sendPasswordResetEmail = async ({ to, token }) => {
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+
+  await transporter.sendMail({
+    from: `"Zaynarah" <${process.env.SMTP_USER}>`,
+    to,
+    subject: 'Reset your password – Zaynarah',
+    html: `
+      <div style="font-family:Arial;padding:24px">
+        <h2>Password reset request</h2>
+        <p>You requested to reset your password.</p>
+        <p>If this was not you, you can safely ignore this email.</p>
+        <a href="${resetUrl}"
+           style="display:inline-block;padding:12px 20px;
+           background:#111;color:#fff;border-radius:24px;
+           text-decoration:none;font-weight:bold;margin-top:16px">
+           Reset Password
+        </a>
+        <p style="margin-top:24px;font-size:12px;color:#777">
+          This link expires in 30 minutes.
+        </p>
+      </div>
+    `,
+  });
+};
+
+exports.sendPasswordResetSuccessEmail = async ({ to, password }) => {
+  await transporter.sendMail({
+    from: `"Zaynarah" <${process.env.SMTP_USER}>`,
+    to,
+    subject: 'Your password has been reset – Zaynarah',
+    html: `
+      <div style="font-family:Arial;padding:24px">
+        <h2>Password reset successful</h2>
+        <p>Your password has been reset. Use the temporary password below to log in:</p>
+        <div style="margin:16px 0;padding:12px;
+             background:#f5f5f5;border-radius:8px;
+             font-family:monospace;font-size:16px">
+          ${password}
+        </div>
+        <p>Please log in and change your password immediately from your profile.</p>
+      </div>
+    `,
+  });
+};
+
 exports.sendNotificationEmail = async ({
   to,
   subject,

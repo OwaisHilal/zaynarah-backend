@@ -83,3 +83,47 @@ exports.resendVerification = async (userId) => {
 
   return true;
 };
+
+exports.forgotPassword = async (email) => {
+  const user = await User.findOne({ email });
+  if (!user) return true;
+
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+
+  user.passwordResetToken = hashedToken;
+  user.passwordResetTokenExpires = Date.now() + 30 * 60 * 1000; // 30 min
+
+  await user.save({ validateBeforeSave: false });
+
+  await mailer.sendPasswordResetEmail({
+    to: user.email,
+    token: resetToken,
+  });
+
+  return true;
+};
+
+exports.resetPassword = async ({ token, newPassword }) => {
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+  const user = await User.findOne({
+    passwordResetToken: hashedToken,
+    passwordResetTokenExpires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    throw new ApiError(400, 'Invalid or expired reset token');
+  }
+
+  user.password = newPassword;
+  user.passwordResetToken = undefined;
+  user.passwordResetTokenExpires = undefined;
+
+  await user.save();
+
+  return true;
+};
