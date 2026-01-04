@@ -12,15 +12,65 @@ exports.register = async (req, res, next) => {
 
 exports.login = async (req, res, next) => {
   try {
-    const result = await authService.login(req.validatedBody);
+    const meta = {
+      userAgent: req.headers['user-agent'],
+      ip: req.ip,
+    };
+    const result = await authService.login(req.validatedBody, meta);
     res.json(result);
   } catch (err) {
     next(err);
   }
 };
 
+exports.logout = async (req, res, next) => {
+  try {
+    await authService.logoutSession(req.session.jti);
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.me = async (req, res) => {
-  res.json(req.user);
+  res.json({
+    user: req.user,
+    currentSessionId: req.session._id,
+  });
+};
+
+exports.listSessions = async (req, res, next) => {
+  try {
+    const sessions = await authService.listSessions(req.user.id);
+    res.json({
+      currentSessionId: req.session._id,
+      sessions,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.revokeSession = async (req, res, next) => {
+  try {
+    await authService.revokeSessionById(
+      req.user.id,
+      req.params.sessionId,
+      req.session._id
+    );
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.revokeAllSessions = async (req, res, next) => {
+  try {
+    await authService.revokeAllExceptCurrent(req.user.id, req.session._id);
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
 };
 
 exports.verifyEmail = async (req, res, next) => {
@@ -41,14 +91,9 @@ exports.resendVerification = async (req, res, next) => {
   }
 };
 
-/* =========================
-   PASSWORD RESET
-========================= */
-
 exports.forgotPassword = async (req, res, next) => {
   try {
-    const { email } = req.body;
-    await authService.forgotPassword(email);
+    await authService.forgotPassword(req.body.email);
     res.json({ success: true });
   } catch (err) {
     next(err);
@@ -57,8 +102,7 @@ exports.forgotPassword = async (req, res, next) => {
 
 exports.resetPassword = async (req, res, next) => {
   try {
-    const { token, newPassword } = req.body;
-    await authService.resetPassword({ token, newPassword });
+    await authService.resetPassword(req.body);
     res.json({ success: true });
   } catch (err) {
     next(err);

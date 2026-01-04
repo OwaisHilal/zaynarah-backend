@@ -2,11 +2,12 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../users/users.model');
+const UserSession = require('./userSession.model');
 const ApiError = require('../../core/errors/ApiError');
 const mailer = require('../../services/mailer.service');
 
-function signToken(id) {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+function signToken({ userId, jti }) {
+  return jwt.sign({ id: userId, jti }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   });
 }
@@ -23,7 +24,7 @@ exports.register = async ({ name, email, password }) => {
     password,
     emailVerified: false,
     emailVerifyToken,
-    emailVerifyTokenExpires: Date.now() + 24 * 60 * 60 * 1000,
+    emailVerifyTokenExpires: Date.now() + 86400000,
   });
 
   await mailer.sendVerificationEmail({
@@ -31,11 +32,16 @@ exports.register = async ({ name, email, password }) => {
     token: emailVerifyToken,
   });
 
-  const token = signToken(user.id);
-  return { user, token };
+  const jti = crypto.randomUUID();
+  await UserSession.create({ user: user.id, jti });
+
+  return {
+    user,
+    token: signToken({ userId: user.id, jti }),
+  };
 };
 
-exports.login = async ({ email, password }) => {
+exports.login = async ({ email, password }, meta) => {
   const user = await User.findOne({ email }).select('+password');
   if (!user) throw new ApiError(400, 'Invalid credentials');
 
@@ -46,8 +52,54 @@ exports.login = async ({ email, password }) => {
     throw new ApiError(403, 'Please verify your email first');
   }
 
-  const token = signToken(user.id);
-  return { user, token };
+  const jti = crypto.randomUUID();
+
+  await UserSession.create({
+    user: user.id,
+    jti,
+    userAgent: meta?.userAgent,
+    ip: meta?.ip,
+  });
+
+  return {
+    user,
+    token: signToken({ userId: user.id, jti }),
+  };
+};
+
+exports.logoutSession = async (jti) => {
+  await UserSession.findOneAndUpdate(
+    { jti, revokedAt: null },
+    { revokedAt: new Date() }
+  );
+};
+
+exports.listSessions = async (userId) => {
+  return UserSession.find({ user: userId, revokedAt: null })
+    .sort({ lastSeenAt: -1 })
+    .lean();
+};
+
+exports.revokeSessionById = async (userId, sessionId, currentSessionId) => {
+  if (sessionId === String(currentSessionId)) {
+    throw new ApiError(400, 'Cannot revoke current session');
+  }
+
+  await UserSession.findOneAndUpdate(
+    { _id: sessionId, user: userId, revokedAt: null },
+    { revokedAt: new Date() }
+  );
+};
+
+exports.revokeAllExceptCurrent = async (userId, currentSessionId) => {
+  await UserSession.updateMany(
+    {
+      user: userId,
+      revokedAt: null,
+      _id: { $ne: currentSessionId },
+    },
+    { revokedAt: new Date() }
+  );
 };
 
 exports.verifyEmail = async (token) => {
@@ -63,16 +115,14 @@ exports.verifyEmail = async (token) => {
   user.emailVerifyTokenExpires = undefined;
 
   await user.save();
-  return true;
 };
 
 exports.resendVerification = async (userId) => {
   const user = await User.findById(userId);
-  if (!user) throw new ApiError(404, 'User not found');
-  if (user.emailVerified) return true;
+  if (!user || user.emailVerified) return;
 
   user.emailVerifyToken = crypto.randomBytes(32).toString('hex');
-  user.emailVerifyTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
+  user.emailVerifyTokenExpires = Date.now() + 86400000;
 
   await user.save();
 
@@ -80,13 +130,11 @@ exports.resendVerification = async (userId) => {
     to: user.email,
     token: user.emailVerifyToken,
   });
-
-  return true;
 };
 
 exports.forgotPassword = async (email) => {
   const user = await User.findOne({ email });
-  if (!user) return true;
+  if (!user) return;
 
   const resetToken = crypto.randomBytes(32).toString('hex');
   const hashedToken = crypto
@@ -95,7 +143,7 @@ exports.forgotPassword = async (email) => {
     .digest('hex');
 
   user.passwordResetToken = hashedToken;
-  user.passwordResetTokenExpires = Date.now() + 30 * 60 * 1000; // 30 min
+  user.passwordResetTokenExpires = Date.now() + 1800000;
 
   await user.save({ validateBeforeSave: false });
 
@@ -103,8 +151,6 @@ exports.forgotPassword = async (email) => {
     to: user.email,
     token: resetToken,
   });
-
-  return true;
 };
 
 exports.resetPassword = async ({ token, newPassword }) => {
@@ -115,15 +161,11 @@ exports.resetPassword = async ({ token, newPassword }) => {
     passwordResetTokenExpires: { $gt: Date.now() },
   });
 
-  if (!user) {
-    throw new ApiError(400, 'Invalid or expired reset token');
-  }
+  if (!user) throw new ApiError(400, 'Invalid or expired reset token');
 
   user.password = newPassword;
   user.passwordResetToken = undefined;
   user.passwordResetTokenExpires = undefined;
 
   await user.save();
-
-  return true;
 };
