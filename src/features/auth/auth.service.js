@@ -6,9 +6,12 @@ const UserSession = require('./userSession.model');
 const ApiError = require('../../core/errors/ApiError');
 const mailer = require('../../services/mailer.service');
 
-function signToken({ userId, jti }) {
+const SHORT_SESSION = process.env.JWT_EXPIRES_SHORT || '1d';
+const LONG_SESSION = process.env.JWT_EXPIRES_LONG || '30d';
+
+function signToken({ userId, jti, rememberMe }) {
   return jwt.sign({ id: userId, jti }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    expiresIn: rememberMe ? LONG_SESSION : SHORT_SESSION,
   });
 }
 
@@ -37,11 +40,11 @@ exports.register = async ({ name, email, password }) => {
 
   return {
     user,
-    token: signToken({ userId: user.id, jti }),
+    token: signToken({ userId: user.id, jti, rememberMe: false }),
   };
 };
 
-exports.login = async ({ email, password }, meta) => {
+exports.login = async ({ email, password, rememberMe }, meta) => {
   const user = await User.findOne({ email }).select('+password');
   if (!user) throw new ApiError(400, 'Invalid credentials');
 
@@ -63,7 +66,11 @@ exports.login = async ({ email, password }, meta) => {
 
   return {
     user,
-    token: signToken({ userId: user.id, jti }),
+    token: signToken({
+      userId: user.id,
+      jti,
+      rememberMe: !!rememberMe,
+    }),
   };
 };
 

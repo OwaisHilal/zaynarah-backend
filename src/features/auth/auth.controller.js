@@ -16,7 +16,13 @@ exports.login = async (req, res, next) => {
       userAgent: req.headers['user-agent'],
       ip: req.ip,
     };
-    const result = await authService.login(req.validatedBody, meta);
+
+    const body = {
+      ...req.validatedBody,
+      rememberMe: !!req.validatedBody?.rememberMe,
+    };
+
+    const result = await authService.login(body, meta);
     res.json(result);
   } catch (err) {
     next(err);
