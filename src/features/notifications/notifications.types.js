@@ -10,6 +10,7 @@ module.exports = {
   NOTIFICATION_TYPES: {
     ORDER_CREATED: 'order_created',
     ORDER_PAID: 'order_paid',
+    ORDER_INVOICE_EMAIL: 'order_invoice_email',
     ORDER_SHIPPED: 'order_shipped',
     ORDER_DELIVERED: 'order_delivered',
     ORDER_CANCELLED: 'order_cancelled',

@@ -10,7 +10,6 @@ new Worker(
     const notification = job.data;
 
     const rule = emailRules[notification.type] || emailRules.__default;
-
     if (!rule.sendEmail) return;
 
     const user = await User.findById(notification.user).lean();
@@ -24,12 +23,30 @@ new Worker(
       return;
     }
 
+    let attachments = [];
+
+    // ⬇️ Invoice attachment (ONLY for invoice email)
+    if (notification.type === 'ORDER_INVOICE_EMAIL') {
+      const invoiceService = require('../orders/services/invoice.service');
+
+      const pdfBuffer = await invoiceService.generateInvoicePdf(
+        notification.entityId
+      );
+
+      attachments.push({
+        filename: `invoice-${notification.entityId}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      });
+    }
+
     await sendNotificationEmail({
       to: user.email,
       subject: notification.title,
       title: notification.title,
       message: notification.message,
       actionUrl: notification.actionUrl,
+      attachments,
     });
   },
   connection

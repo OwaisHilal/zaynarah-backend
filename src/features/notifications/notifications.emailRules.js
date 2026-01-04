@@ -32,6 +32,12 @@ module.exports = {
     roles: ['admin'],
   },
 
+  [NOTIFICATION_TYPES.ORDER_INVOICE_EMAIL]: {
+    sendEmail: true,
+    priority: PRIORITY.HIGH,
+    roles: ['customer'],
+  },
+
   __default: {
     sendEmail: false,
     priority: PRIORITY.NORMAL,
