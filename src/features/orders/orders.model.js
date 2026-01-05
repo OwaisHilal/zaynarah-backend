@@ -1,3 +1,4 @@
+// backend/src/features/orders/orders.model.js
 const mongoose = require('mongoose');
 
 const addressSchema = new mongoose.Schema(
@@ -118,37 +119,36 @@ const orderSchema = new mongoose.Schema(
     paymentMethod: {
       type: String,
       enum: ['stripe', 'razorpay'],
-      required: true,
-    },
-
-    paymentDetails: {
-      type: Object,
-      default: {},
+      default: null,
     },
 
     paymentProvider: {
       type: String,
       enum: ['stripe', 'razorpay'],
+      default: null,
     },
 
     paymentIntentId: {
       type: String,
       index: true,
+      default: null,
     },
 
     paymentStatus: {
       type: String,
-      enum: ['pending', 'paid', 'failed'],
-      default: 'pending',
+      enum: ['uninitiated', 'pending', 'paid', 'failed', 'refunded'],
+      default: 'uninitiated',
       index: true,
     },
 
     failureReason: {
       type: String,
+      default: null,
     },
 
     failedAt: {
       type: Date,
+      default: null,
     },
 
     refunds: {
@@ -168,14 +168,15 @@ const orderSchema = new mongoose.Schema(
       type: String,
       enum: [
         'draft',
-        'pending',
-        'paid',
+        'priced',
+        'payment_pending',
+        'confirmed',
         'shipped',
         'delivered',
         'failed',
         'cancelled',
       ],
-      default: 'pending',
+      default: 'draft',
       index: true,
     },
 
@@ -189,7 +190,10 @@ const orderSchema = new mongoose.Schema(
       default: {},
     },
 
-    paidAt: Date,
+    paidAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );

@@ -25,10 +25,8 @@ new Worker(
 
     let attachments = [];
 
-    // ⬇️ Invoice attachment (ONLY for invoice email)
     if (notification.type === 'ORDER_INVOICE_EMAIL') {
       const invoiceService = require('../orders/services/invoice.service');
-
       const pdfBuffer = await invoiceService.generateInvoicePdf(
         notification.entityId
       );

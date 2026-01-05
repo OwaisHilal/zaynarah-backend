@@ -9,32 +9,35 @@ const {
   NOTIFICATION_TYPES,
 } = require('../../notifications/notifications.types');
 
+async function pushStatusHistory(order, from, to, actor, note) {
+  order.statusHistory.push({
+    from,
+    to,
+    at: new Date(),
+    actor: actor
+      ? {
+          id: actor._id,
+          role: actor.role,
+        }
+      : undefined,
+    note,
+  });
+}
+
 module.exports = {
-  updateStatus: async (orderId, status, actor, note) => {
+  updateStatus: async (orderId, nextStatus, actor, note) => {
     const order = await Order.findById(orderId);
     if (!order) throw new ApiError(404, 'Order not found');
 
-    if (order.status === status) return order.toObject();
+    if (order.status === nextStatus) return order.toObject();
 
     const fromStatus = order.status;
-    order.status = status;
+    order.status = nextStatus;
 
-    if (actor) {
-      order.statusHistory.push({
-        from: fromStatus,
-        to: status,
-        at: new Date(),
-        actor: {
-          id: actor._id,
-          role: actor.role,
-        },
-        note,
-      });
-    }
-
+    await pushStatusHistory(order, fromStatus, nextStatus, actor, note);
     await order.save();
 
-    if (status === 'cancelled') {
+    if (nextStatus === 'cancelled') {
       await notificationsService.enqueue({
         userId: order.user,
         type: NOTIFICATION_TYPES.ORDER_CANCELLED,
@@ -60,8 +63,11 @@ module.exports = {
     };
 
     if (order.status === 'paid' && fulfillment.trackingId) {
+      const fromStatus = order.status;
       order.status = 'shipped';
       order.fulfillment.shippedAt = fulfillment.shippedAt || new Date();
+
+      await pushStatusHistory(order, fromStatus, 'shipped', null, null);
 
       await notificationsService.enqueue({
         userId: order.user,
@@ -76,7 +82,10 @@ module.exports = {
     }
 
     if (order.status === 'shipped' && fulfillment.deliveredAt) {
+      const fromStatus = order.status;
       order.status = 'delivered';
+
+      await pushStatusHistory(order, fromStatus, 'delivered', null, null);
 
       await notificationsService.enqueue({
         userId: order.user,
@@ -98,8 +107,13 @@ module.exports = {
     const order = await Order.findById(orderId);
     if (!order) throw new ApiError(404, 'Order not found');
 
-    if (order.paymentStatus === 'paid') {
-      return order.toObject();
+    if (order.paymentStatus === 'paid') return order.toObject();
+
+    if (order.status !== 'payment_pending') {
+      throw new ApiError(
+        400,
+        `Cannot mark order paid from status ${order.status}`
+      );
     }
 
     for (const item of order.items) {
@@ -110,11 +124,21 @@ module.exports = {
       }
     }
 
+    const fromStatus = order.status;
+
     order.paymentIntentId = paymentIntentId;
     order.paymentProvider = gateway;
     order.paymentStatus = 'paid';
     order.status = 'paid';
     order.paidAt = new Date();
+
+    await pushStatusHistory(
+      order,
+      fromStatus,
+      'paid',
+      null,
+      `Payment confirmed via ${gateway}`
+    );
 
     await order.save();
     await Cart.findOneAndUpdate({ user: order.user }, { items: [] });
@@ -148,19 +172,24 @@ module.exports = {
     const order = await Order.findById(orderId);
     if (!order) throw new ApiError(404, 'Order not found');
 
-    if (order.paymentStatus === 'paid') {
-      return order.toObject();
+    if (order.paymentStatus === 'paid') return order.toObject();
+    if (order.paymentStatus === 'failed') return order.toObject();
+
+    if (!['payment_pending', 'priced'].includes(order.status)) {
+      throw new ApiError(
+        400,
+        `Cannot mark order failed from status ${order.status}`
+      );
     }
 
-    if (order.paymentStatus === 'failed') {
-      return order.toObject();
-    }
+    const fromStatus = order.status;
 
     order.paymentStatus = 'failed';
-    order.status = 'pending';
+    order.status = 'failed';
     order.failureReason = reason;
     order.failedAt = new Date();
 
+    await pushStatusHistory(order, fromStatus, 'failed', null, reason);
     await order.save();
 
     await notificationsService.enqueue({

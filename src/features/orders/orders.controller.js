@@ -1,4 +1,4 @@
-/* backend/src/features/orders/orders.controller.js */
+// backend/src/features/orders/orders.controller.js
 const ordersService = require('./orders.service');
 
 async function legacyCreateDisabled(req, res) {
@@ -92,10 +92,6 @@ module.exports = {
 
   listAdmin: async (req, res, next) => {
     try {
-      if (req.user.role !== 'admin') {
-        return res.status(403).json({ message: 'Admin required' });
-      }
-
       const { page = 1, limit = 50, status } = req.query;
       const orders = await ordersService.listForAdmin({ page, limit, status });
       res.json(orders);
@@ -106,10 +102,6 @@ module.exports = {
 
   updateStatus: async (req, res, next) => {
     try {
-      if (req.user.role !== 'admin') {
-        return res.status(403).json({ message: 'Admin required' });
-      }
-
       const id = req.validatedParams?.id || req.params.id;
       const { status, note } = req.validatedBody;
 
@@ -128,18 +120,10 @@ module.exports = {
 
   updateFulfillment: async (req, res, next) => {
     try {
-      if (req.user.role !== 'admin') {
-        return res.status(403).json({ message: 'Admin required' });
-      }
-
       const id = req.validatedParams?.id || req.params.id;
       const { fulfillment } = req.validatedBody;
 
-      const order = await ordersService.updateFulfillment(
-        id,
-        fulfillment,
-        req.user
-      );
+      const order = await ordersService.updateFulfillment(id, fulfillment);
 
       res.json(order);
     } catch (err) {
@@ -166,28 +150,6 @@ module.exports = {
     } catch (err) {
       next(err);
     }
-  },
-
-  createDraft: async (req, res, next) => {
-    try {
-      const { checkoutSessionId, paymentGateway } = req.validatedBody;
-
-      const order = await ordersService.createDraftOrder(req.user._id, {
-        checkoutSessionId,
-        paymentGateway,
-      });
-
-      res.json(order);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  confirmPayment: async () => {
-    return res.status(403).json({
-      message:
-        'Direct payment confirmation is disabled. Payments are verified server-side.',
-    });
   },
 
   paymentFailed: async (req, res, next) => {

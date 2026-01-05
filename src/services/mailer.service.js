@@ -4,18 +4,29 @@ const nodemailer = require('nodemailer');
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
-  secure: false,
+  secure: Number(process.env.SMTP_PORT) === 465,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
 });
 
+const FROM = `"Zaynarah" <${process.env.SMTP_USER}>`;
+
+async function sendMail({ to, subject, html, attachments }) {
+  return transporter.sendMail({
+    from: FROM,
+    to,
+    subject,
+    html,
+    attachments,
+  });
+}
+
 exports.sendVerificationEmail = async ({ to, token }) => {
   const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
 
-  await transporter.sendMail({
-    from: `"Zaynarah" <${process.env.SMTP_USER}>`,
+  return sendMail({
     to,
     subject: 'Verify your email – Zaynarah',
     html: `
@@ -36,8 +47,7 @@ exports.sendVerificationEmail = async ({ to, token }) => {
 exports.sendPasswordResetEmail = async ({ to, token }) => {
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
 
-  await transporter.sendMail({
-    from: `"Zaynarah" <${process.env.SMTP_USER}>`,
+  return sendMail({
     to,
     subject: 'Reset your password – Zaynarah',
     html: `
@@ -60,8 +70,7 @@ exports.sendPasswordResetEmail = async ({ to, token }) => {
 };
 
 exports.sendPasswordResetSuccessEmail = async ({ to, password }) => {
-  await transporter.sendMail({
-    from: `"Zaynarah" <${process.env.SMTP_USER}>`,
+  return sendMail({
     to,
     subject: 'Your password has been reset – Zaynarah',
     html: `
@@ -85,11 +94,12 @@ exports.sendNotificationEmail = async ({
   title,
   message,
   actionUrl,
+  attachments = [],
 }) => {
-  await transporter.sendMail({
-    from: `"Zaynarah" <${process.env.SMTP_USER}>`,
+  return sendMail({
     to,
     subject,
+    attachments,
     html: `
       <div style="font-family:Arial;padding:32px;max-width:560px">
         <h2 style="margin-bottom:12px">${title}</h2>

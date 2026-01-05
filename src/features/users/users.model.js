@@ -19,7 +19,13 @@ const AddressSchema = new mongoose.Schema({
 const UserSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
     password: { type: String, required: true },
 
     role: { type: String, enum: ['customer', 'admin'], default: 'customer' },

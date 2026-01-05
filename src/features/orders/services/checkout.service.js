@@ -1,3 +1,4 @@
+// backend/src/features/orders/services/checkout.service.js
 const Order = require('../orders.model');
 const Cart = require('../../cart/cart.model');
 const ApiError = require('../../../core/errors/ApiError');
@@ -43,10 +44,15 @@ module.exports = {
         grand: subtotal,
         currency: 'INR',
       },
-      paymentMethod: 'stripe',
-      paymentProvider: null,
-      paymentStatus: 'pending',
-      status: 'pending',
+      status: 'draft',
+      paymentStatus: 'uninitiated',
+      statusHistory: [
+        {
+          from: null,
+          to: 'draft',
+          note: 'Checkout session created from cart',
+        },
+      ],
       metadata: { createdFrom: 'cart', cartId: cart._id },
     });
 
@@ -68,6 +74,10 @@ module.exports = {
     const order = await Order.findOne({ checkoutSessionId, user: userId });
     if (!order) throw new ApiError(404, 'Checkout session not found');
 
+    if (order.status !== 'draft') {
+      throw new ApiError(400, 'Order is not in draft state');
+    }
+
     const subtotal = order.items.reduce((s, i) => s + i.price * i.qty, 0);
     const shippingCost =
       shippingMethod && typeof shippingMethod === 'object'
@@ -88,6 +98,14 @@ module.exports = {
       currency: order.cartTotal.currency || 'INR',
     };
 
+    order.statusHistory.push({
+      from: order.status,
+      to: 'priced',
+      note: 'Pricing finalized',
+    });
+
+    order.status = 'priced';
+
     await order.save();
 
     return {
@@ -101,12 +119,30 @@ module.exports = {
     };
   },
 
-  createDraftOrder: async (userId, { checkoutSessionId, paymentGateway }) => {
+  preparePayment: async (userId, { checkoutSessionId, paymentGateway }) => {
+    if (!checkoutSessionId || !paymentGateway) {
+      throw new ApiError(400, 'checkoutSessionId and paymentGateway required');
+    }
+
     const order = await Order.findOne({ checkoutSessionId, user: userId });
     if (!order) throw new ApiError(404, 'Checkout session not found');
 
+    if (order.status !== 'priced') {
+      throw new ApiError(400, 'Order is not ready for payment');
+    }
+
     order.paymentMethod = paymentGateway;
     order.paymentProvider = paymentGateway;
+    order.paymentStatus = 'pending';
+
+    order.statusHistory.push({
+      from: order.status,
+      to: 'payment_pending',
+      note: `Payment initiated via ${paymentGateway}`,
+    });
+
+    order.status = 'payment_pending';
+
     await order.save();
 
     return order.toObject();

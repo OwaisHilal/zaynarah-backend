@@ -1,4 +1,4 @@
-//backend/src/features/notifications/notifications.model.js
+// backend/src/features/notifications/notifications.model.js
 const mongoose = require('mongoose');
 
 const notificationSchema = new mongoose.Schema(
@@ -25,20 +25,24 @@ const notificationSchema = new mongoose.Schema(
     entityId: {
       type: mongoose.Schema.Types.ObjectId,
       index: true,
+      default: null,
     },
 
     title: {
       type: String,
       required: true,
+      trim: true,
     },
 
     message: {
       type: String,
       required: true,
+      trim: true,
     },
 
     actionUrl: {
       type: String,
+      default: null,
     },
 
     priority: {

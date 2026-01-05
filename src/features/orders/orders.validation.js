@@ -1,3 +1,4 @@
+// backend/src/features/orders/orders.validation.js
 const { z } = require('zod');
 
 const objectIdString = z
@@ -43,17 +44,6 @@ const finalizePricingSchema = z.object({
   shippingMethod: shippingMethodSchema,
 });
 
-const createDraftSchema = z.object({
-  checkoutSessionId: z.string().min(1),
-  paymentGateway: z.enum(['stripe', 'razorpay']),
-});
-
-const confirmPaymentSchema = z.object({
-  orderId: objectIdString,
-  paymentIntentId: z.string().min(1),
-  gateway: z.enum(['stripe', 'razorpay']),
-});
-
 const paymentFailedSchema = z.object({
   orderId: objectIdString,
   reason: z.string().min(1).optional(),
@@ -66,8 +56,9 @@ const idParamSchema = z.object({
 const updateStatusSchema = z.object({
   status: z.enum([
     'draft',
-    'pending',
-    'paid',
+    'priced',
+    'payment_pending',
+    'confirmed',
     'shipped',
     'delivered',
     'failed',
@@ -83,8 +74,6 @@ const updateFulfillmentSchema = z.object({
 module.exports = {
   initSessionSchema,
   finalizePricingSchema,
-  createDraftSchema,
-  confirmPaymentSchema,
   paymentFailedSchema,
   idParamSchema,
   updateStatusSchema,

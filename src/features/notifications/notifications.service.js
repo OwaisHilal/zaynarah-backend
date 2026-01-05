@@ -3,13 +3,12 @@ const Notification = require('./notifications.model');
 const { notificationsQueue } = require('../../services/queue.service');
 
 function buildJobId(payload) {
-  const parts = [
+  return [
     payload.userId,
     payload.type,
     payload.entityType,
     payload.entityId || 'none',
-  ];
-  return parts.join(':');
+  ].join(':');
 }
 
 module.exports = {
@@ -44,16 +43,19 @@ module.exports = {
       actionUrl,
       priority,
       metadata,
+      readAt: null,
     });
   },
 
   listForUser: async (userId, { page = 1, limit = 20 } = {}) => {
-    const skip = (page - 1) * limit;
+    const safePage = Math.max(Number(page) || 1, 1);
+    const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
+    const skip = (safePage - 1) * safeLimit;
 
     return Notification.find({ user: userId })
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit)
+      .limit(safeLimit)
       .lean();
   },
 
@@ -66,15 +68,26 @@ module.exports = {
 
   markAsRead: async (userId, notificationId) => {
     await Notification.updateOne(
-      { _id: notificationId, user: userId, readAt: null },
-      { $set: { readAt: new Date() } }
+      {
+        _id: notificationId,
+        user: userId,
+        readAt: null,
+      },
+      {
+        $set: { readAt: new Date() },
+      }
     );
   },
 
   markAllAsRead: async (userId) => {
     await Notification.updateMany(
-      { user: userId, readAt: null },
-      { $set: { readAt: new Date() } }
+      {
+        user: userId,
+        readAt: null,
+      },
+      {
+        $set: { readAt: new Date() },
+      }
     );
   },
 };

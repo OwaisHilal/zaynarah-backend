@@ -10,6 +10,10 @@ module.exports = (err, req, res, next) => {
     });
   }
 
+  if (!err.statusCode || err.statusCode >= 500) {
+    console.error('[ERROR]', err);
+  }
+
   // Custom ApiError
   if (err.statusCode) {
     return res.status(err.statusCode).json({

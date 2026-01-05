@@ -1,3 +1,4 @@
+// backend/src/features/orders/services/invoice.service.js
 const Order = require('../orders.model');
 const ApiError = require('../../../core/errors/ApiError');
 const puppeteer = require('puppeteer');
@@ -7,6 +8,16 @@ function formatCurrency(value, currency = 'INR') {
     style: 'currency',
     currency,
   }).format(value);
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 function buildInvoiceHtml(order) {
@@ -108,17 +119,18 @@ function buildInvoiceHtml(order) {
       </div>
       <div class="meta">
         <div>Invoice #${order._id}</div>
-        <div>${new Date(order.createdAt).toLocaleDateString()}</div>
-        <div>Status: ${order.paymentStatus}</div>
+        <div>${new Date(order.createdAt).toLocaleDateString('en-IN')}</div>
+        <div>Status: ${escapeHtml(order.paymentStatus)}</div>
       </div>
     </div>
 
     <h2>Billing Address</h2>
     <p>
-      ${billing.name || ''}<br/>
-      ${billing.line1 || ''}<br/>
-      ${billing.city || ''} ${billing.postalCode || ''}<br/>
-      ${billing.country || ''}
+      ${escapeHtml(billing.fullName)}<br/>
+      ${escapeHtml(billing.addressLine1)}<br/>
+      ${escapeHtml(billing.addressLine2)}<br/>
+      ${escapeHtml(billing.city)} ${escapeHtml(billing.postalCode)}<br/>
+      ${escapeHtml(billing.country)}
     </p>
 
     <h2>Items</h2>
@@ -136,7 +148,7 @@ function buildInvoiceHtml(order) {
           .map(
             (i) => `
           <tr>
-            <td>${i.title}</td>
+            <td>${escapeHtml(i.title)}</td>
             <td>${i.qty}</td>
             <td>${formatCurrency(i.price, totals.currency)}</td>
             <td>${formatCurrency(i.price * i.qty, totals.currency)}</td>
@@ -188,6 +200,7 @@ module.exports = {
     if (!order) throw new ApiError(404, 'Order not found');
 
     const browser = await puppeteer.launch({
+      headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
 
@@ -199,12 +212,7 @@ module.exports = {
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
-      margin: {
-        top: '20mm',
-        bottom: '20mm',
-        left: '20mm',
-        right: '20mm',
-      },
+      preferCSSPageSize: true,
     });
 
     await browser.close();

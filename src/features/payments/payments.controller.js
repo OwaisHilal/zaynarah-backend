@@ -1,12 +1,10 @@
 // src/features/payments/payments.controller.js
 const Order = require('../orders/orders.model');
 const paymentService = require('../../services/payment.service');
-const ordersService = require('../orders/orders.service');
 
 exports.createStripeCheckoutSession = async (req, res, next) => {
   try {
-    const { orderId } = req.body;
-    if (!orderId) return res.status(400).json({ message: 'orderId required' });
+    const { orderId } = req.validatedBody;
 
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: 'Order not found' });
@@ -16,6 +14,12 @@ exports.createStripeCheckoutSession = async (req, res, next) => {
         sessionId: order.paymentIntentId,
         publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || 'dev',
         reused: true,
+      });
+    }
+
+    if (order.status !== 'payment_pending') {
+      return res.status(400).json({
+        message: `Order not ready for payment (status: ${order.status})`,
       });
     }
 
@@ -38,28 +42,16 @@ exports.createStripeCheckoutSession = async (req, res, next) => {
   }
 };
 
-exports.verifyStripePayment = async (req, res) => {
-  const { orderId } = req.body;
-
-  if (!orderId) {
-    return res.status(400).json({ message: 'orderId required' });
-  }
-
-  if (!process.env.STRIPE_SECRET_KEY) {
-    await ordersService.markPaid(orderId, {
-      gateway: 'stripe',
-      paymentIntentId: 'dev',
-    });
-    return res.json({ success: true, dev: true });
-  }
-
-  res.status(501).json({ message: 'Stripe verification not implemented' });
+exports.verifyStripePayment = async (_req, res) => {
+  res.status(403).json({
+    message:
+      'Direct payment verification is disabled. Payments are confirmed server-side via webhooks.',
+  });
 };
 
 exports.createRazorpayOrder = async (req, res, next) => {
   try {
-    const { orderId } = req.body;
-    if (!orderId) return res.status(400).json({ message: 'orderId required' });
+    const { orderId } = req.validatedBody;
 
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: 'Order not found' });
@@ -69,6 +61,12 @@ exports.createRazorpayOrder = async (req, res, next) => {
         orderId: order.paymentIntentId,
         key: process.env.RAZORPAY_KEY_ID || 'dev',
         reused: true,
+      });
+    }
+
+    if (order.status !== 'payment_pending') {
+      return res.status(400).json({
+        message: `Order not ready for payment (status: ${order.status})`,
       });
     }
 
@@ -89,31 +87,16 @@ exports.createRazorpayOrder = async (req, res, next) => {
   }
 };
 
-exports.verifyRazorpaySignature = async (req, res) => {
-  const { orderId } = req.body;
-
-  if (!orderId) {
-    return res.status(400).json({ message: 'orderId required' });
-  }
-
-  if (!process.env.RAZORPAY_KEY_ID) {
-    await ordersService.markPaid(orderId, {
-      gateway: 'razorpay',
-      paymentIntentId: 'dev',
-    });
-    return res.json({ success: true, dev: true });
-  }
-
-  res.status(501).json({ message: 'Razorpay verification not implemented' });
+exports.verifyRazorpaySignature = async (_req, res) => {
+  res.status(403).json({
+    message:
+      'Direct payment verification is disabled. Payments are confirmed server-side via webhooks.',
+  });
 };
 
 exports.refundPayment = async (req, res, next) => {
   try {
-    const { orderId, amount, reason } = req.body;
-
-    if (!orderId || !amount) {
-      return res.status(400).json({ message: 'orderId and amount required' });
-    }
+    const { orderId, amount, reason } = req.validatedBody;
 
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: 'Order not found' });
@@ -141,7 +124,7 @@ exports.refundPayment = async (req, res, next) => {
     order.refunds.push({
       amount,
       gateway: order.paymentProvider,
-      refundId: refund.id || 'dev',
+      refundId: refund?.id || 'dev',
       reason,
     });
 
@@ -154,5 +137,6 @@ exports.refundPayment = async (req, res, next) => {
 };
 
 exports.getPaymentStatus = async (req, res) => {
-  res.json({ status: 'pending' });
+  const { paymentId } = req.validatedParams;
+  res.json({ status: 'pending', paymentId });
 };

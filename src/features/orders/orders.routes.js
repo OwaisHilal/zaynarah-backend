@@ -1,4 +1,4 @@
-/* backend/src/features/orders/orders.routes.js */
+// backend/src/features/orders/orders.routes.js
 const express = require('express');
 const router = express.Router();
 const ctrl = require('./orders.controller');
@@ -10,8 +10,6 @@ const {
   idParamSchema,
   initSessionSchema,
   finalizePricingSchema,
-  createDraftSchema,
-  confirmPaymentSchema,
   paymentFailedSchema,
 } = require('./orders.validation');
 
@@ -29,13 +27,6 @@ router.post(
   requireLogin,
   validate({ body: finalizePricingSchema }),
   ctrl.finalizePricing
-);
-
-router.post(
-  '/create-draft',
-  requireLogin,
-  validate({ body: createDraftSchema }),
-  ctrl.createDraft
 );
 
 router.post('/create', requireLogin, (_req, res) => {
@@ -70,13 +61,6 @@ router.put(
   requireAdmin,
   validate({ body: updateFulfillmentSchema, params: idParamSchema }),
   ctrl.updateFulfillment
-);
-
-router.post(
-  '/confirm-payment',
-  requireLogin,
-  validate({ body: confirmPaymentSchema }),
-  ctrl.confirmPayment
 );
 
 router.post(
