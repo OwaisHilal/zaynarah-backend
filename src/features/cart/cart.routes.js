@@ -11,7 +11,6 @@ const {
   adminGetCartsSchema,
 } = require('./cart.validation');
 
-// --- User routes ---
 router.get('/', requireLogin, ctrl.getCart);
 router.post('/add', requireLogin, validate(addItemSchema), ctrl.addItem);
 router.post('/merge', requireLogin, ctrl.mergeCart);
@@ -22,15 +21,16 @@ router.put(
   validate({ body: updateItemSchema, params: removeItemSchema }),
   ctrl.updateItem
 );
+
 router.delete(
   '/remove/:productId',
   requireLogin,
   validate({ params: removeItemSchema }),
   ctrl.removeItem
 );
+
 router.delete('/clear', requireLogin, ctrl.clearCart);
 
-// --- Admin route ---
 router.get(
   '/all',
   requireLogin,

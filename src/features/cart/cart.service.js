@@ -4,36 +4,36 @@ const Product = require('../products/products.model');
 const ApiError = require('../../core/errors/ApiError');
 const mongoose = require('mongoose');
 
-module.exports = {
-  // -------------------------------------------------
-  // GET CART
-  // -------------------------------------------------
-  getCartByUser: async (userId) => {
-    let cart = await Cart.findOne({ user: userId }).populate('items.product');
+const clampQty = (qty, max) => {
+  const q = Number(qty) || 1;
+  return Math.max(1, Math.min(q, max));
+};
 
+module.exports = {
+  async getCartByUser(userId) {
+    let cart = await Cart.findOne({ user: userId }).populate('items.product');
     if (!cart) {
       cart = await Cart.create({ user: userId, items: [] });
+      await cart.populate('items.product');
     }
-
-    return cart; // raw cart (controller normalizes)
+    return cart;
   },
 
-  // -------------------------------------------------
-  // ADD ITEM
-  // -------------------------------------------------
-  addItem: async (userId, productId, quantity = 1) => {
+  async addItem(userId, productId, quantity = 1) {
     const product = await Product.findById(productId);
     if (!product) throw new ApiError(404, 'Product not found');
+
+    const qty = clampQty(quantity, product.stock);
 
     let cart = await Cart.findOne({ user: userId });
     if (!cart) cart = await Cart.create({ user: userId, items: [] });
 
-    const existing = cart.items.find((i) => i.product.equals(productId));
+    const existing = cart.items.find((i) => i.product.equals(product._id));
 
     if (existing) {
-      existing.quantity += quantity;
+      existing.quantity = clampQty(existing.quantity + qty, product.stock);
     } else {
-      cart.items.push({ product: productId, quantity });
+      cart.items.push({ product: product._id, quantity: qty });
     }
 
     await cart.save();
@@ -41,27 +41,24 @@ module.exports = {
     return cart;
   },
 
-  // -------------------------------------------------
-  // UPDATE ITEM
-  // -------------------------------------------------
-  updateItem: async (userId, productId, quantity) => {
-    if (quantity < 1) throw new ApiError(400, 'Quantity must be at least 1');
+  async updateItem(userId, productId, quantity) {
+    const product = await Product.findById(productId);
+    if (!product) throw new ApiError(404, 'Product not found');
+
+    const qty = clampQty(quantity, product.stock);
 
     let cart = await Cart.findOne({ user: userId }).populate('items.product');
     if (!cart) throw new ApiError(404, 'Cart not found');
 
-    const item = cart.items.find((i) => i.product.equals(productId));
+    const item = cart.items.find((i) => i.product.equals(product._id));
     if (!item) throw new ApiError(404, 'Product not in cart');
 
-    item.quantity = quantity;
+    item.quantity = qty;
     await cart.save();
     return cart;
   },
 
-  // -------------------------------------------------
-  // REMOVE ITEM
-  // -------------------------------------------------
-  removeItem: async (userId, productId) => {
+  async removeItem(userId, productId) {
     let cart = await Cart.findOne({ user: userId }).populate('items.product');
     if (!cart) throw new ApiError(404, 'Cart not found');
 
@@ -70,11 +67,8 @@ module.exports = {
     return cart;
   },
 
-  // -------------------------------------------------
-  // CLEAR CART
-  // -------------------------------------------------
-  clearCart: async (userId) => {
-    let cart = await Cart.findOne({ user: userId }).populate('items.product');
+  async clearCart(userId) {
+    let cart = await Cart.findOne({ user: userId });
     if (!cart) throw new ApiError(404, 'Cart not found');
 
     cart.items = [];
@@ -82,36 +76,36 @@ module.exports = {
     return cart;
   },
 
-  // -------------------------------------------------
-  // MERGE CART AFTER LOGIN
-  // -------------------------------------------------
-  mergeCart: async (userId, clientItems) => {
-    let cart = await Cart.findOne({ user: userId }).populate('items.product');
+  async mergeCart(userId, clientItems) {
+    let cart = await Cart.findOne({ user: userId });
     if (!cart) cart = await Cart.create({ user: userId, items: [] });
 
-    clientItems.forEach((ci) => {
-      if (!ci.productId) return;
+    const items = Array.isArray(clientItems) ? clientItems : [];
 
-      const pid = new mongoose.Types.ObjectId(ci.productId);
-      const existing = cart.items.find((i) => i.product.equals(pid));
+    for (const ci of items) {
+      if (!ci.productId) continue;
+      if (!mongoose.Types.ObjectId.isValid(ci.productId)) continue;
+
+      const product = await Product.findById(ci.productId);
+      if (!product) continue;
+
+      const qty = clampQty(ci.qty || ci.quantity || 1, product.stock);
+
+      const existing = cart.items.find((i) => i.product.equals(product._id));
 
       if (existing) {
-        existing.quantity += ci.qty || ci.quantity || 1;
+        existing.quantity = clampQty(existing.quantity + qty, product.stock);
       } else {
-        cart.items.push({ product: pid, quantity: ci.qty || ci.quantity || 1 });
+        cart.items.push({ product: product._id, quantity: qty });
       }
-    });
+    }
 
     await cart.save();
     await cart.populate('items.product');
     return cart;
   },
 
-  // -------------------------------------------------
-  // ADMIN GET ALL
-  // -------------------------------------------------
-  getAllCarts: async () => {
-    const carts = await Cart.find().populate('user items.product');
-    return carts; // admin gets raw
+  async getAllCarts() {
+    return Cart.find().populate('user items.product');
   },
 };

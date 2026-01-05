@@ -18,7 +18,7 @@ const normalizeCart = (cart) => {
 };
 
 module.exports = {
-  getCart: async (req, res, next) => {
+  async getCart(req, res, next) {
     try {
       const cart = await cartService.getCartByUser(req.user.id);
       res.json(normalizeCart(cart));
@@ -27,38 +27,34 @@ module.exports = {
     }
   },
 
-  addItem: async (req, res, next) => {
+  async addItem(req, res, next) {
     try {
       const { productId, quantity } = req.validatedBody;
       const cart = await cartService.addItem(req.user.id, productId, quantity);
-
       res.json(normalizeCart(cart));
     } catch (err) {
       next(err);
     }
   },
 
-  updateItem: async (req, res, next) => {
+  async updateItem(req, res, next) {
     try {
       const { quantity } = req.validatedBody;
       const { productId } = req.validatedParams;
-
       const cart = await cartService.updateItem(
         req.user.id,
         productId,
         quantity
       );
-
       res.json(normalizeCart(cart));
     } catch (err) {
       next(err);
     }
   },
 
-  removeItem: async (req, res, next) => {
+  async removeItem(req, res, next) {
     try {
       const { productId } = req.validatedParams;
-
       const cart = await cartService.removeItem(req.user.id, productId);
       res.json(normalizeCart(cart));
     } catch (err) {
@@ -66,7 +62,7 @@ module.exports = {
     }
   },
 
-  clearCart: async (req, res, next) => {
+  async clearCart(req, res, next) {
     try {
       const cart = await cartService.clearCart(req.user.id);
       res.json(normalizeCart(cart));
@@ -75,21 +71,20 @@ module.exports = {
     }
   },
 
-  mergeCart: async (req, res, next) => {
+  async mergeCart(req, res, next) {
     try {
       const { items } = req.body;
       const cart = await cartService.mergeCart(req.user.id, items || []);
-
       res.json(normalizeCart(cart));
     } catch (err) {
       next(err);
     }
   },
 
-  getAllCarts: async (req, res, next) => {
+  async getAllCarts(req, res, next) {
     try {
       const carts = await cartService.getAllCarts();
-      res.json(carts); // Admin gets raw data
+      res.json(carts);
     } catch (err) {
       next(err);
     }
